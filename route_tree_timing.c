@@ -221,12 +221,11 @@ add_path_to_route_tree(struct s_heap* hptr,
     /* Adds the most recent wire segment, ending at the SINK indicated by hptr, *
      * to the routing tree.  It returns the first (most upstream) new rt_node,  *
      * and (via a pointer) the rt_node of the new SINK.                         */
-    int inode, remaining_connections_to_sink;
     short iedge, iswitch;
     double C_downstream;
     t_rt_node* rt_node, *downstream_rt_node, *sink_rt_node;
     t_linked_rt_edge* linked_rt_edge;
-    inode = hptr->index;
+    int inode = hptr->index;
 #ifdef DEBUG
 
     if (rr_node[inode].type != SINK) {
@@ -238,7 +237,6 @@ add_path_to_route_tree(struct s_heap* hptr,
     }
 
 #endif
-    remaining_connections_to_sink = rr_node_route_inf[inode].target_flag;
     sink_rt_node = alloc_rt_node();
     sink_rt_node->u.child_list = NULL;
     sink_rt_node->inode = inode;

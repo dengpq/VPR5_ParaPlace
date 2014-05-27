@@ -8,7 +8,7 @@
 /*The propose of start_finish_nets is to evenly divide up the work allocated
  * to each processor for:
  *  compute_net_slacks_parallel();
- *  comp_td_costs_parallel();
+ *  compute_td_costs_parallel_with_update_crit();
  *  comp_bb_cost_parallel();
  *
  * allocating an equal # of nets per partition does not work since the inner loop
@@ -90,8 +90,8 @@ typedef struct s_thread_local_common_paras {
     int            local_y_start;
     int            local_y_end;
 
-    int            local_x_boundary[3];
-    int            local_y_boundary[3];
+    int            local_region_x_boundary[3];
+    int            local_region_y_boundary[3];
     /* both temperature and range_limit updating depended on success_ratio */
     double         local_temper;
     double         local_old_temper;
@@ -116,7 +116,7 @@ typedef struct s_thread_local_common_paras {
     double         local_timing_cost;
     double         local_delay_cost;
 
-    int            local_num_connections;
+    int            local_num_conns;
     /* place_delay_value = delay_cost / num_connections */
     double         local_place_delay_value;
     /* sum_of_squares = total_cost * total_cost */
@@ -133,11 +133,16 @@ typedef struct s_thread_local_common_paras {
     /* success_ratio = success_sum / total_iter */
     double         local_success_ratio;
     double         local_std_dev;
-} __attribute__((aligned(64))) thread_local_common_data_t;
+} __attribute__((aligned(64))) thread_local_common_paras_t;
 
 typedef struct s_thread_local_data_for_swap {
+    grid_tile_t**   m_local_grid;
+    local_block_t*  m_local_block;
+
     bbox_t*         m_bb_coord_new;
     bbox_t*         m_bb_edge_new;
+    int*            m_nets_to_update;
+    int*            m_net_block_moved;
 
     bbox_t*         m_local_bb_coord;
     bbox_t*         m_local_bb_edge;
@@ -146,15 +151,7 @@ typedef struct s_thread_local_data_for_swap {
     double*         m_local_net_cost;
     double*         m_local_temp_net_cost;
 
-    local_block_t*  m_local_block;
-    grid_tile_t*    m_local_grid;
-
-    int*            m_nets_to_update;
-    int*            m_net_block_moved;
-
-    double**        m_local_point_to_point_timing_cost;
     double**        m_local_temp_point_to_point_timing_cost;
-    double**        m_local_point_to_point_delay_cost;
     double**        m_local_temp_point_to_point_delay_cost;
 } __attribute__((aligned(64))) thread_local_data_for_swap_t;
 
@@ -175,14 +172,14 @@ typedef struct s_region_y_boundary {
     int y_top;
 } region_y_boundary_t;
 
-/* local data for inside the try_swap loop */
+/* local data for inside the try_swap loop
 struct swap {
     int x_to, y_to, z_to, to_block;
     int i, k, inet, keep_switch, num_of_pins;
     int num_nets_affected, bb_index;
     double delta_c, bb_delta_c, timing_delta_c, delay_delta_c;
     int iNeighbor;
-} __attribute__ ((aligned(64)));
+} __attribute__ ((aligned(64))); */
 
 /* specialized mutex to prevent false sharing*/
 typedef struct aligned_mutex {

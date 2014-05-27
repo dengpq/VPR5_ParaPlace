@@ -760,15 +760,8 @@ is_cbox(IN int chan,
         IN segment_details_t* seg_details,
         IN directionality_t directionality)
 {
-    int start, length, ofs, fac, start_seg;
-    fac = 1;
-
-    if (UNI_DIRECTIONAL == directionality) {
-        fac = 2;
-    }
-
-    start = seg_details[track].start;
-    length = seg_details[track].length;
+    int ofs, start_seg;
+    int length = seg_details[track].length;
     /* Make sure they gave us correct start */
     start_seg = get_seg_start(seg_details, track, chan, seg);
     ofs = seg - start_seg;
@@ -1613,20 +1606,16 @@ is_sbox(IN int chan,
         IN segment_details_t* seg_details,
         IN directionality_t directionality)
 {
-    int start, length, ofs, fac;
-    fac = 1;
-
+    int fac = 1;
     if (UNI_DIRECTIONAL == directionality) {
         fac = 2;
     }
 
-    start = seg_details[track].start;
-    length = seg_details[track].length;
+    int length = seg_details[track].length;
     /* Make sure they gave us correct start */
     wire_seg = get_seg_start(seg_details, track, chan, wire_seg);
-    ofs = sb_seg - wire_seg + 1;    /* Ofset 0 is behind us, so add 1 */
-    assert(ofs >= 0);
-    assert(ofs < (length + 1));
+    int ofs = sb_seg - wire_seg + 1;    /* Ofset 0 is behind us, so add 1 */
+    assert(ofs >= 0 && ofs < length + 1);
 
     /* If unidir segment that is going backwards, we need to flip the ofs */
     if ((ofs % fac) > 0) {
@@ -2383,16 +2372,14 @@ label_incoming_wires(IN int chan_num,
 
 
 
+/* Returns the index/label in array wire_mux_on_track whose entry equals from_track. If none are
+ * found, then returns the index of the entry whose value is the largest */
 static int
 find_label_of_track(int* wire_mux_on_track,
                     int num_wire_muxes,
                     int from_track)
 {
-    int i, max_label, nearest_label, max_entry, nearest_entry;
-    /* Returns the index/label in array wire_mux_on_track whose entry equals from_track. If none are
-     * found, then returns the index of the entry whose value is the largest */
-    max_label = nearest_label = max_entry = nearest_entry = -1;
-
+    int i;
     for (i = 0; i < num_wire_muxes; i++) {
         if (wire_mux_on_track[i] == from_track) {
             return i;   /* matched, return now */

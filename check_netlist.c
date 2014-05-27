@@ -47,18 +47,15 @@ static int check_fb_to_subblock_connections(int iblk,
 
 
 /*********************** Subroutine definitions *****************************/
-
-void
-check_netlist(subblock_data_t* subblock_data_ptr)
+void check_netlist(subblock_data_t* subblock_data_ptr)
 {
     /* This routine checks that the netlist makes sense, and sets the num_ff    *
      * and num_const_gen members of subblock_data.                              */
     int i, error, num_conn, max_subblocks, max_pins, max_sub_opins;
-    int* num_uses_of_fb_pin, **num_uses_of_sblk_opin,
-         *num_subblocks_per_block;
+    int* num_uses_of_fb_pin, **num_uses_of_sblk_opin;
     struct s_hash** net_hash_table, *h_ptr;
     net_hash_table = alloc_hash_table();
-    num_subblocks_per_block = subblock_data_ptr->num_subblocks_per_block;
+    /* int* num_subblocks_per_block = subblock_data_ptr->num_subblocks_per_block; */
     subblock_data_ptr->num_ff = 0;
     subblock_data_ptr->num_const_gen = 0;
     error = 0;

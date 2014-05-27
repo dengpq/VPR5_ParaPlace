@@ -21,9 +21,6 @@ static void check_pass_transistors(int from_node);
 
 /************************ Subroutine definitions ****************************/
 
-static boolean rr_graph_error;
-static boolean rr_graph_warn;
-
 void
 check_rr_graph(IN t_graph_type graph_type,
                IN int num_types,

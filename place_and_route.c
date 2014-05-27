@@ -323,7 +323,6 @@ static int binary_search_place_and_route(placer_opts_t placer_opts,
 
     int high = -1;
     int final = -1;
-    int try_w_limit = 0;
 
     int attempt_count = 0;
     while (final == -1) {

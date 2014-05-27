@@ -562,14 +562,10 @@ build_fb_tnodes(int iblk,
     int isub, ipin, iedge, from_pin, opin;
     int inode, to_node, num_edges;
     t_tedge* tedge;
-    int clk_pin;
-    block_type_ptr type;
-    int* next_ipin_edge;
-    int i;
 
-    type = block[iblk].type;
-    next_ipin_edge = (int*)my_malloc(type->num_pins * sizeof(int));
-    clk_pin = 0;
+    block_type_ptr type = block[iblk].type;
+    int* next_ipin_edge = (int*)my_malloc(type->num_pins * sizeof(int));
+    int clk_pin = 0;
 
     /* Start by allocating the tedge arrays, and for opins, loading them.    */
 

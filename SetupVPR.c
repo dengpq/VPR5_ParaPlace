@@ -12,18 +12,21 @@
 
 static void SetupOperation(IN t_options Options,
                            OUT operation_types_t* Operation);
+
 static void SetupPlacerOpts(IN t_options Options,
                             IN boolean TimingEnabled,
                             OUT placer_opts_t* PlacerOpts);
+
 static void SetupAnnealSched(IN t_options Options,
                              OUT annealing_sched_t* AnnealSched);
+
 static void SetupRouterOpts(IN t_options Options,
                             IN boolean TimingEnabled,
                             OUT router_opts_t* RouterOpts);
-static void SetupGlobalRoutingArch(OUT detail_routing_arch_t* RoutingArch,
-                                   OUT segment_info_t** Segments);
+
 static void SetupRoutingArch(IN t_arch Arch,
                              OUT detail_routing_arch_t* RoutingArch);
+
 static void SetupTiming(IN t_options Options,
                         IN t_arch Arch,
                         IN boolean TimingEnabled,
@@ -31,13 +34,20 @@ static void SetupTiming(IN t_options Options,
                         IN placer_opts_t PlacerOpts,
                         IN router_opts_t RouterOpts,
                         OUT timing_info_t* Timing);
+
 static void load_subblock_info_to_type(INOUT subblock_data_t* subblocks,
                                        INOUT block_type_ptr type);
+
 static void InitArch(IN t_arch Arch);
+
 static void alloc_and_load_grid(INOUT int* num_instances_type); /* [0..num_types-1] */
+
 static void freeGrid();
+
 static void CheckGrid(void);
+
 static block_type_ptr find_type_col(IN int x);
+
 static void SetupSwitches(IN t_arch Arch,
                           INOUT detail_routing_arch_t* RoutingArch,
                           IN switch_info_t* ArchSwitches,
