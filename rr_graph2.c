@@ -619,17 +619,12 @@ get_bidir_opin_connections(IN int i,
 
         /* Itterate of the opin to track connections */
         for (iconn = 0; iconn < Fc; ++iconn) {
-            to_track =
-                opin_to_track_map[type->
-                                  index][ipin][ofs][iside][iconn];
+            to_track = opin_to_track_map[type->index][ipin][ofs][iside][iconn];
 
             /* Skip unconnected connections */
             if (OPEN == to_track || is_connected_track) {
                 is_connected_track = TRUE;
-                assert(OPEN ==
-                       opin_to_track_map[type->
-                                         index][ipin][ofs][iside]
-                       [0]);
+                assert(OPEN == opin_to_track_map[type->index][ipin][ofs][iside][0]);
                 continue;
             }
 

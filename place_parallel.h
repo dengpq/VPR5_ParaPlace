@@ -170,14 +170,13 @@ typedef struct aligned_mutex {
 } __attribute__((aligned(64))) aligned_mutex_t;
 
 /* global data declarations */
-aligned_neighbor_bar_t  neigh_bar[NUM_OF_THREADS];
-aligned_bar_t  barrier1[NUM_OF_THREADS];
+aligned_bar_t    thread_barriers[NUM_OF_THREADS];
 aligned_mutex_t  global_data_access;
 /* In VPR_ParaPlace, partial_result was used for bb_cost and timing_cost,
  * partial_results was used for delay_cost. */
-double partial_results[NUM_OF_THREADS];
-double partial_results2[NUM_OF_THREADS];
-
+double partial_timing_results[NUM_OF_THREADS];
+double partial_delay_results[NUM_OF_THREADS];
+double partial_bb_results[NUM_OF_THREADS];
 
 /*calculate wall-time difference*/
 typedef struct {

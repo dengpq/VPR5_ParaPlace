@@ -71,7 +71,7 @@ struct s_type_descriptor* type_descriptors = NULL;
 
 block_type_ptr IO_TYPE = NULL;
 block_type_ptr EMPTY_TYPE = NULL;
-block_type_ptr FILL_TYPE = NULL;
+block_type_ptr CLB_TYPE = NULL;
 
 
 /******** Physical architecture stuff ********/

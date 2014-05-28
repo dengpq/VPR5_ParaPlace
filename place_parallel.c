@@ -100,7 +100,7 @@ static void initial_swap_data(thread_local_common_paras_t*  common_paras_ptr,
 
 static void find_fanin_parallel(const int kthread_id);
 
-static void tp_init_localvert_grid(void);
+static void initial_localvert_grid(void);
 
 static void perform_timing_analyze_parallel(const int thread_id,
                                             double*** net_delay,
@@ -657,12 +657,8 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
     } else {
         /*BOUNDING_BOX_PLACE */
         cost = bb_cost;
-        timing_cost = 0;
-        delay_cost = 0;
-        num_connections = 0;
-        max_delay = 0;
-        place_delay_value = 0;
-        crit_exponent = 0;
+        timing_cost = delay_cost = num_connections = max_delay = 0;
+        place_delay_value = crit_exponent = 0;
 
         inverse_prev_timing_cost = 0;   /*inverses not used */
         inverse_prev_bb_cost = 0;
@@ -747,118 +743,120 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
 
     pthread_data_t thread_data_array[NUM_OF_THREADS];
     pthread_t place_threads[NUM_OF_THREADS];
-    int count = -1;
-    for (count = NUM_OF_THREADS - 1; count >= 0 ; --count) {
+
+    int thread_id = -1;
+    for (thread_id = NUM_OF_THREADS - 1; thread_id >= 0 ; --thread_id) {
         /* for x_start */
-        if (count % horizon_regions ==  0 || horizon_regions == 1) {
-            thread_data_array[count].x_start = 0;
-        } else if (count % horizon_regions == 1) {
-            thread_data_array[count].x_start = cols_assign_to_thread;
-        } else if (count % horizon_regions < extra_cols + 1) {
-            thread_data_array[count].x_start =
-                (count % horizon_regions - 1) * (cols_assign_to_thread + 1)
+        if (thread_id % horizon_regions == 0 || horizon_regions == 1) {
+            thread_data_array[thread_id].x_start = 0;
+        } else if (thread_id % horizon_regions == 1) {
+            thread_data_array[thread_id].x_start = cols_assign_to_thread;
+        } else if (thread_id % horizon_regions < extra_cols + 1) {
+            thread_data_array[thread_id].x_start =
+                (thread_id % horizon_regions - 1) * (cols_assign_to_thread + 1)
                     + cols_assign_to_thread;
         } else {
-            thread_data_array[count].x_start =
-                (count % horizon_regions) * cols_assign_to_thread + extra_cols;
+            thread_data_array[thread_id].x_start =
+                (thread_id % horizon_regions) * cols_assign_to_thread + extra_cols;
         }
         /* for x_end */
-        if (count % horizon_regions == horizon_regions - 1 || horizon_regions == 1) {
-            thread_data_array[count].x_end = num_grid_columns + 2;
-        } else if (count % horizon_regions == 0) {
-            thread_data_array[count].x_end = cols_assign_to_thread;
-        } else if (count % horizon_regions < extra_cols + 1) {
-            thread_data_array[count].x_end =
-                (count % horizon_regions) * (cols_assign_to_thread + 1)
+        if (thread_id % horizon_regions == horizon_regions - 1 || horizon_regions == 1) {
+            thread_data_array[thread_id].x_end = num_grid_columns + 2;
+        } else if (thread_id % horizon_regions == 0) {
+            thread_data_array[thread_id].x_end = cols_assign_to_thread;
+        } else if (thread_id % horizon_regions < extra_cols + 1) {
+            thread_data_array[thread_id].x_end =
+                (thread_id % horizon_regions) * (cols_assign_to_thread + 1)
                     + cols_assign_to_thread;
         } else {
-            thread_data_array[count].x_end =
-             (count % horizon_regions + 1) * cols_assign_to_thread + extra_cols;
+            thread_data_array[thread_id].x_end =
+             (thread_id % horizon_regions + 1) * cols_assign_to_thread + extra_cols;
         }
         /* for y_start */
-        if (count / horizon_regions == 0 || verti_regions == 1) {
-            thread_data_array[count].y_start = 0;
-        } else if (count / horizon_regions == 1) {
-            thread_data_array[count].y_start = rows_assign_to_thread;
-        } else if (count / horizon_regions < extra_rows + 1) {
-            thread_data_array[count].y_start =
-                (count / horizon_regions - 1) * (rows_assign_to_thread + 1)
+        if (thread_id / horizon_regions == 0 || verti_regions == 1) {
+            thread_data_array[thread_id].y_start = 0;
+        } else if (thread_id / horizon_regions == 1) {
+            thread_data_array[thread_id].y_start = rows_assign_to_thread;
+        } else if (thread_id / horizon_regions < extra_rows + 1) {
+            thread_data_array[thread_id].y_start =
+                (thread_id / horizon_regions - 1) * (rows_assign_to_thread + 1)
                     + rows_assign_to_thread;
         } else {
-            thread_data_array[count].y_start =
-                (count / horizon_regions) * rows_assign_to_thread + extra_rows;
+            thread_data_array[thread_id].y_start =
+                (thread_id / horizon_regions) * rows_assign_to_thread + extra_rows;
         }
         /* for y_end */
-        if (count / horizon_regions == verti_regions - 1 || verti_regions == 1) {
-            thread_data_array[count].y_end = num_grid_rows + 2;
-        } else if (count / horizon_regions == 0) {
-            thread_data_array[count].y_end = rows_assign_to_thread;
-        } else if (count / horizon_regions < extra_rows + 1) {
-            thread_data_array[count].y_end =
-                (count / horizon_regions) * (rows_assign_to_thread + 1)
+        if (thread_id / horizon_regions == verti_regions - 1 || verti_regions == 1) {
+            thread_data_array[thread_id].y_end = num_grid_rows + 2;
+        } else if (thread_id / horizon_regions == 0) {
+            thread_data_array[thread_id].y_end = rows_assign_to_thread;
+        } else if (thread_id / horizon_regions < extra_rows + 1) {
+            thread_data_array[thread_id].y_end =
+                (thread_id / horizon_regions) * (rows_assign_to_thread + 1)
                      + rows_assign_to_thread;
         } else {
-            thread_data_array[count].y_end =
-                ((count / horizon_regions) + 1) * rows_assign_to_thread + extra_rows;
+            thread_data_array[thread_id].y_end =
+                ((thread_id / horizon_regions) + 1) * rows_assign_to_thread + extra_rows;
         }
         /* Initial region boundary OK */
-        /* each region must be at least 8 X 8 */
-        assert(thread_data_array[count].x_end - thread_data_array[count].x_start > 8);
-        assert(thread_data_array[count].y_end - thread_data_array[count].y_start > 8);
 
-        thread_data_array[count].thread_id = count;
+        /* each region must be at least 8 X 8 */
+        assert(thread_data_array[thread_id].x_end - thread_data_array[thread_id].x_start > 8);
+        assert(thread_data_array[thread_id].y_end - thread_data_array[thread_id].y_start > 8);
+
+        thread_data_array[thread_id].thread_id = thread_id;
         /* For each thread, it had these following global varibbles local copy, *
          * so it must synchronous with pthread mutex */
-        thread_data_array[count].placer_opts = placer_opts;
-        thread_data_array[count].annealing_sched = annealing_sched;
-        thread_data_array[count].fixed_pins = fixed_pins;
-        thread_data_array[count].net_slack = net_slack;
-        thread_data_array[count].net_delay = net_delay;
+        thread_data_array[thread_id].placer_opts = placer_opts;
+        thread_data_array[thread_id].annealing_sched = annealing_sched;
+        thread_data_array[thread_id].fixed_pins = fixed_pins;
+        thread_data_array[thread_id].net_slack = net_slack;
+        thread_data_array[thread_id].net_delay = net_delay;
 
-        thread_data_array[count].t = &t;
+        thread_data_array[thread_id].t = &t;
 
-        thread_data_array[count].bb_cost = &bb_cost;
-        thread_data_array[count].timing_cost = &timing_cost;
-        thread_data_array[count].delay_cost = &delay_cost;
-        thread_data_array[count].inverse_prev_bb_cost = &inverse_prev_bb_cost;
-        thread_data_array[count].inverse_prev_timing_cost = &inverse_prev_timing_cost;
-        thread_data_array[count].av_cost = &av_cost;
-        thread_data_array[count].av_bb_cost = &av_bb_cost;
-        thread_data_array[count].av_timing_cost = &av_timing_cost;
-        thread_data_array[count].av_delay_cost = &av_delay_cost;
-        thread_data_array[count].cost = &cost;
+        thread_data_array[thread_id].bb_cost = &bb_cost;
+        thread_data_array[thread_id].timing_cost = &timing_cost;
+        thread_data_array[thread_id].delay_cost = &delay_cost;
+        thread_data_array[thread_id].inverse_prev_bb_cost = &inverse_prev_bb_cost;
+        thread_data_array[thread_id].inverse_prev_timing_cost = &inverse_prev_timing_cost;
+        thread_data_array[thread_id].av_cost = &av_cost;
+        thread_data_array[thread_id].av_bb_cost = &av_bb_cost;
+        thread_data_array[thread_id].av_timing_cost = &av_timing_cost;
+        thread_data_array[thread_id].av_delay_cost = &av_delay_cost;
+        thread_data_array[thread_id].cost = &cost;
 
-        thread_data_array[count].move_lim = &move_lim;
-        thread_data_array[count].inner_iter_num = &inner_iter_num;
-        thread_data_array[count].tot_iter = &tot_iter;
-        thread_data_array[count].success_sum = &success_sum;
-        thread_data_array[count].success_rat = &success_rat;
-        thread_data_array[count].sum_of_squares = &sum_of_squares;
-        thread_data_array[count].std_dev = &std_dev;
+        thread_data_array[thread_id].move_lim = &move_lim;
+        thread_data_array[thread_id].inner_iter_num = &inner_iter_num;
+        thread_data_array[thread_id].tot_iter = &tot_iter;
+        thread_data_array[thread_id].success_sum = &success_sum;
+        thread_data_array[thread_id].success_rat = &success_rat;
+        thread_data_array[thread_id].sum_of_squares = &sum_of_squares;
+        thread_data_array[thread_id].std_dev = &std_dev;
 
-        thread_data_array[count].place_delay_value = &place_delay_value;
-        thread_data_array[count].max_delay = &max_delay;
-        thread_data_array[count].num_connections = &num_connections;
+        thread_data_array[thread_id].place_delay_value = &place_delay_value;
+        thread_data_array[thread_id].max_delay = &max_delay;
+        thread_data_array[thread_id].num_connections = &num_connections;
 
-        thread_data_array[count].crit_exponent = &crit_exponent;
-        thread_data_array[count].exit = &exit;
-        thread_data_array[count].range_limit = &range_limit;
+        thread_data_array[thread_id].crit_exponent = &crit_exponent;
+        thread_data_array[thread_id].exit = &exit;
+        thread_data_array[thread_id].range_limit = &range_limit;
 
-        assert(thread_data_array[count].y_end > thread_data_array[count].y_start);
+        assert(thread_data_array[thread_id].y_end > thread_data_array[thread_id].y_start);
 
-        if (count != 0) {
-             pthread_create(&place_threads[count],
+        if (thread_id != 0) {
+             pthread_create(&place_threads[thread_id],
                             NULL,
                             try_place_parallel,
-                            (void*)&thread_data_array[count]);
+                            (void*)&thread_data_array[thread_id]);
         } else {
-            /* Why count == 0, it needn't create pthread? */
-            try_place_parallel(&thread_data_array[count]);
+            /* Why thread_id == 0, it needn't create pthread? */
+            try_place_parallel(&thread_data_array[thread_id]);
         }
-    } /* end of for(count = NUM_OF_THREADS-1; count >= 0; --count) */
+    } /* end of for(thread_id = NUM_OF_THREADS-1; thread_id >= 0; --thread_id) */
 
-    for (count = NUM_OF_THREADS - 1; count > 0; --count) {
-        pthread_join(place_threads[count], NULL);
+    for (thread_id = NUM_OF_THREADS - 1; thread_id > 0; --thread_id) {
+        pthread_join(place_threads[thread_id], NULL);
     }
 
     pthread_mutex_destroy(&global_data_access.mutex);
@@ -952,7 +950,6 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
     free(x_lookup);
 }  /* end of try_place_use_multi_threads() */
 
-
 /* ====== parallel placement functions ======*/
 /* polling barriers */
 /* Binary tree based barrier except node 0 and 1.
@@ -969,55 +966,55 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
  */
 static void barrier_polling(int kthread_id)
 {
-    ++(barrier1[kthread_id].entry);
+    ++(thread_barriers[kthread_id].entry);
 
-    const int local_entry = (barrier1[kthread_id].entry ) % 2;
+    const int local_entry = (thread_barriers[kthread_id].entry ) % 2;
     if (NUM_OF_THREADS == 1) {
         return;
     } else if (kthread_id == 0) {
         /* wait for kthread_id 1 finished */
-        while (barrier1[1].arrived != local_entry) {};
+        while (thread_barriers[1].arrived != local_entry) {};
 
-        barrier1[1].proceed = local_entry;
+        thread_barriers[1].proceed = local_entry;
     } else if (kthread_id == 1) {
         /* wait for children finished */
         if (NUM_OF_THREADS > 3) {
-            while (barrier1[2].arrived != local_entry || barrier1[3].arrived != local_entry) {};
+            while (thread_barriers[2].arrived != local_entry || thread_barriers[3].arrived != local_entry) {};
         } else if (NUM_OF_THREADS > 2) {
-            while (barrier1[2].arrived != local_entry) {};
+            while (thread_barriers[2].arrived != local_entry) {};
         }
 
         /* signal my arrival */
-        barrier1[kthread_id].arrived = local_entry;
+        thread_barriers[kthread_id].arrived = local_entry;
 
-        while (barrier1[kthread_id].proceed != local_entry) {};
+        while (thread_barriers[kthread_id].proceed != local_entry) {};
 
         //release children
         if (NUM_OF_THREADS > 3) {
-            barrier1[2].proceed = barrier1[3].proceed = local_entry;
+            thread_barriers[2].proceed = thread_barriers[3].proceed = local_entry;
         } else if (NUM_OF_THREADS > 2) {
-            barrier1[2].proceed = local_entry;
+            thread_barriers[2].proceed = local_entry;
         }
     } else { /* kthread_id > 1 */
         /* wait for children finished! */
         if (NUM_OF_THREADS > kthread_id * 2 + 1) {
-            while (barrier1[kthread_id * 2].arrived != local_entry
-                    || barrier1[kthread_id * 2 + 1].arrived != local_entry) {};
+            while (thread_barriers[kthread_id * 2].arrived != local_entry
+                    || thread_barriers[kthread_id * 2 + 1].arrived != local_entry) {};
         } else if (NUM_OF_THREADS > kthread_id * 2) {
-            while (barrier1[kthread_id * 2].arrived != local_entry) {};
+            while (thread_barriers[kthread_id * 2].arrived != local_entry) {};
         }
 
         //signal my arrival
-        barrier1[kthread_id].arrived = local_entry;
+        thread_barriers[kthread_id].arrived = local_entry;
 
-        while (barrier1[kthread_id].proceed != local_entry) {};
+        while (thread_barriers[kthread_id].proceed != local_entry) {};
 
         //release children
         if (NUM_OF_THREADS > kthread_id * 2 + 1) {
-            barrier1[kthread_id * 2].proceed =
-                barrier1[kthread_id * 2 + 1].proceed = local_entry;
+            thread_barriers[kthread_id * 2].proceed =
+                thread_barriers[kthread_id * 2 + 1].proceed = local_entry;
         } else if (NUM_OF_THREADS > kthread_id * 2) {
-            barrier1[kthread_id * 2].proceed = local_entry;
+            thread_barriers[kthread_id * 2].proceed = local_entry;
         }
     } /* end of else */
 }  /* end of void barrier_polling(int kthread_id) */
@@ -1026,9 +1023,9 @@ static void barrier_polling_reset(void)
 {
     int x = -1;
     for (x = 0; x < NUM_OF_THREADS; ++x) {
-        barrier1[x].arrived = 0;
-        barrier1[x].proceed = 0;
-        barrier1[x].entry = 0;
+        thread_barriers[x].arrived = 0;
+        thread_barriers[x].proceed = 0;
+        thread_barriers[x].entry = 0;
     }
 } /* end of void barrier_polling_reset() */
 
@@ -1071,7 +1068,7 @@ static void* try_place_parallel(pthread_data_t* input_args)
         barrier_polling(kthread_id);
     } else {
     /*another way of storing data, in columns instead of rows. Why? */
-        tp_init_localvert_grid();
+        initial_localvert_grid();
 
         barrier_polling(kthread_id);
 
@@ -1191,14 +1188,14 @@ static void* try_place_parallel(pthread_data_t* input_args)
                 compute_bb_cost_parallel(start_finish_nets[kthread_id].start_sinks,
                                          start_finish_nets[kthread_id].finish_sinks);
             common_paras.local_bb_cost = wirelength_cost;
-            partial_results[kthread_id] = wirelength_cost;
+            partial_bb_results[kthread_id] = wirelength_cost;
 
             barrier_polling(kthread_id);
             if (kthread_id == 0) {
                 wirelength_cost = 0.0;
                 int update_count = -1;
                 for (update_count = 0; update_count < NUM_OF_THREADS; ++update_count) {
-                    wirelength_cost += partial_results[update_count];
+                    wirelength_cost += partial_bb_results[update_count];
                 }
 
                 *(input_args->bb_cost) = wirelength_cost;
@@ -1523,7 +1520,6 @@ static void compute_net_pin_index_values()
     }
 
     for (inet = 0; inet < num_nets; inet++) {
-
         if (net[inet].is_global) {
             continue;
         }
@@ -1566,9 +1562,8 @@ static double get_std_dev(int n,
 static void update_rlim(double* range_limit,
                         double success_rat)
 {
-    double upper_lim;
     *range_limit = (*range_limit) * (1. - 0.60 + success_rat);
-    upper_lim = max(num_grid_columns, num_grid_rows);
+    double upper_lim = max(num_grid_columns, num_grid_rows);
     *range_limit = min(*range_limit, upper_lim);
     *range_limit = max(*range_limit, 1.);
 }
@@ -1616,24 +1611,19 @@ starting_t(double* cost_ptr,
 {
 
     /* Finds the starting temperature (hot condition).              */
-
-    int i, num_accepted, move_lim;
-    double std_dev, av, sum_of_squares; /* Double important to avoid round off */
-    int* x_lookup;
-
-    x_lookup = (int*)my_malloc(num_grid_columns * sizeof(int));
-
     if (annealing_sched.type == USER_SCHED) {
         return (annealing_sched.init_t);
     }
 
-    move_lim = min(max_moves, num_blocks);
+    int* x_lookup = (int*)my_malloc(num_grid_columns * sizeof(int));
 
-    num_accepted = 0;
-    av = 0.;
-    sum_of_squares = 0.;
+    int move_lim = min(max_moves, num_blocks);
+    int num_accepted = 0;
+    double av = 0.;
+    double sum_of_squares = 0.;
 
     /* Try one move per block.  Set t high so essentially all accepted. */
+    int i;
     for (i = 0; i < move_lim; i++) {
         if (try_swap(1.e30, cost_ptr, bb_cost_ptr, timing_cost_ptr, range_limit,
                      place_cost_type,
@@ -1653,16 +1643,14 @@ starting_t(double* cost_ptr,
         av = 0.;
     }
 
-    std_dev = get_std_dev(num_accepted, sum_of_squares, av);
+    double std_dev = get_std_dev(num_accepted, sum_of_squares, av);
 
 #ifdef DEBUG
-
     if (num_accepted != move_lim) {
         printf
         ("Warning:  Starting t: %d of %d configurations accepted.\n",
          num_accepted, move_lim);
     }
-
 #endif
 
 #ifdef VERBOSE
@@ -2048,41 +2036,36 @@ static int find_affected_nets(int* nets_to_update,
 }
 
 
-static boolean
-find_to(int x_from,
-        int y_from,
-        block_type_ptr type,
-        double range_limit,
-        int* x_lookup,
-        int* x_to,
-        int* y_to)
+/* Returns the point to which I want to swap, properly range limited.
+ * range_limit must always be between 1 and num_grid_columns (inclusive)
+ * for this routine to work. Assumes that a column only contains blocks of
+ * the same type. */
+static boolean find_to(int x_from,
+                       int y_from,
+                       block_type_ptr type,
+                       double range_limit,
+                       int* x_lookup,
+                       int* x_to,
+                       int* y_to)
 {
+    int rlx = min(num_grid_columns, range_limit); /* Only needed when num_grid_columns < num_grid_rows. */
+    int rly = min(num_grid_rows, range_limit);   /* Added rly for aspect_ratio != 1 case. */
 
-    /* Returns the point to which I want to swap, properly range limited.
-     * range_limit must always be between 1 and num_grid_columns (inclusive) for this routine
-     * to work.  Assumes that a column only contains blocks of the same type.
-     */
+    int min_x = max(1, x_from - rlx);
+    int max_x = min(num_grid_columns, x_from + rlx);
+    int min_y = max(1, y_from - rly);
+    int max_y = min(num_grid_rows, y_from + rly);
 
-    int x_rel, y_rel, iside, iplace, rlx, rly, min_x, max_x, min_y, max_y;
-    int num_col_same_type, i, j;
+    int num_col_same_type = 0;
 
-    rlx = min(num_grid_columns, range_limit);    /* Only needed when num_grid_columns < num_grid_rows. */
-    rly = min(num_grid_rows, range_limit);   /* Added rly for aspect_ratio != 1 case. */
-
-    min_x = max(1, x_from - rlx);
-    max_x = min(num_grid_columns, x_from + rlx);
-    min_y = max(1, y_from - rly);
-    max_y = min(num_grid_rows, y_from + rly);
-
-    num_col_same_type = 0;
-    j = 0;
-
+    int i = 0;
+    int j = 0;
     if (type != IO_TYPE) {
-        for (i = min_x; i <= max_x; i++) {
+        for (i = min_x; i <= max_x; ++i) {
             if (grid[i][1].type == type) {
-                num_col_same_type++;
+                ++num_col_same_type;
                 x_lookup[j] = i;
-                j++;
+                ++j;
             }
         }
 
@@ -2096,21 +2079,19 @@ find_to(int x_from,
     }
 
 #ifdef DEBUG
-
     if (rlx < 1 || rlx > num_grid_columns) {
         printf("Error in find_to: rlx = %d\n", rlx);
         exit(1);
     }
-
 #endif
 
+    int x_rel, y_rel, iside, iplace; 
     do {
         /* Until (x_to, y_to) different from (x_from, y_from) */
         if (type == IO_TYPE) {
             /* io_block to be moved. */
             if (rlx >= num_grid_columns) {
                 iside = my_irand(3);
-
                 /*                              *
                  *       +-----1----+           *
                  *       |          |           *
@@ -2203,46 +2184,37 @@ find_to(int x_from,
                     }
                 }
             }   /* End rlx if */
-        }       /* end type if */
-        else {
+        /* end of IO_TYPE */
+        } else {
             x_rel = my_irand(num_col_same_type - 1);
-            y_rel =
-                my_irand(max
-                         (0, ((max_y - min_y) / type->height) - 1));
+            y_rel = my_irand(max(0, ((max_y - min_y) / type->height) - 1));
             *x_to = x_lookup[x_rel];
             *y_to = min_y + y_rel * type->height;
-            *y_to = (*y_to) - grid[*x_to][*y_to].offset;    /* align it */
+            *y_to = (*y_to) - grid[*x_to][*y_to].offset;  /* align it */
             assert(*x_to >= 1 && *x_to <= num_grid_columns);
             assert(*y_to >= 1 && *y_to <= num_grid_rows);
         }
     } while ((x_from == *x_to) && (y_from == *y_to));
 
 #ifdef DEBUG
-
     if (*x_to < 0 || *x_to > num_grid_columns + 1 || *y_to < 0 || *y_to > num_grid_rows + 1) {
         printf("Error in routine find_to:  (x_to,y_to) = (%d,%d)\n",
                *x_to, *y_to);
         exit(1);
     }
-
 #endif
     assert(type == grid[*x_to][*y_to].type);
     return TRUE;
 }
 
 
-static int
-assess_swap(double delta_c,
-            double t)
+/* Returns: 1->move accepted, 0->rejected. */
+static int assess_swap(double delta_c,
+                       double t)
 {
-
-    /* Returns: 1->move accepted, 0->rejected. */
-
     int accept;
     double prob_fac, fnum;
-
     if (delta_c <= 0) {
-
 #ifdef SPEC         /* Reduce variation in final solution due to round off */
         fnum = my_frand();
         //fnum = randfloat();
@@ -2257,7 +2229,6 @@ assess_swap(double delta_c,
     }
 
     fnum = my_frand();
-    //fnum = randfloat();
     prob_fac = exp(-delta_c / t);
 
     if (prob_fac > fnum) {
@@ -2364,9 +2335,7 @@ static void update_td_cost(int from_block,
 
     if (to_block != EMPTY) {
         for (blkpin = 0; blkpin < num_of_pins; blkpin++) {
-
             inet = block[to_block].nets[blkpin];
-
             if (inet == OPEN) {
                 continue;
             }
@@ -3585,46 +3554,45 @@ static void update_bb(int inet,
     }
 }  /* end of static void update_bb(int inet, ), Not parallel */
 
+struct s_pos {
+    int x;
+    int y;
+    int z;
+}** pos;  /* [0..num_types-1][0..type_tsize - 1] */
 
 static void initial_placement(pad_loc_t pad_loc_type,
                               char* pad_loc_file)
 {
     /* Randomly places the blocks to create an initial placement.     */
-    struct s_pos {
-        int x;
-        int y;
-        int z;
-    }** pos;         /* [0..num_types-1][0..type_tsize - 1] */
-
     pos = (struct s_pos**)my_malloc(num_types * sizeof(struct s_pos*));
-    int* count = (int*)my_calloc(num_types, sizeof(int));
-    int* index = (int*)my_calloc(num_types, sizeof(int));
 
+    int* avail_diff_type_grids = (int*)my_calloc(num_types, sizeof(int));
     /* Initialize all occupancy to zero. */
-    int i, j, k, iblk, choice, type_index, x, y, z;
-    for (i = 0; i <= num_grid_columns + 1; i++) {
-        for (j = 0; j <= num_grid_rows + 1; j++) {
+    int i, j, k, iblk;
+    for (i = 0; i <= num_grid_columns + 1; ++i) {
+        for (j = 0; j <= num_grid_rows + 1; ++j) {
             grid[i][j].usage = 0;
 
-            for (k = 0; k < grid[i][j].type->capacity; k++) {
+            for (k = 0; k < grid[i][j].type->capacity; ++k) {
                 grid[i][j].blocks[k] = EMPTY;
-
                 if (grid[i][j].offset == 0) {
-                    ++count[grid[i][j].type->index];
+                    ++avail_diff_type_grids[grid[i][j].type->index];
                 }
             }
         }
     }
 
-    for (i = 0; i < num_types; i++) {
-        pos[i] = (struct s_pos*)my_malloc(count[i] * sizeof(struct s_pos));
+    for (i = 0; i < num_types; ++i) {
+        pos[i] = (struct s_pos*)my_malloc(avail_diff_type_grids[i]
+                                          * sizeof(struct s_pos));
     }
 
+    int* index = (int*)my_calloc(num_types, sizeof(int));
     for (i = 0; i <= num_grid_columns + 1; ++i) {
         for (j = 0; j <= num_grid_rows + 1; ++j) {
             for (k = 0; k < grid[i][j].type->capacity; ++k) {
                 if (grid[i][j].offset == 0) {
-                    type_index = grid[i][j].type->index;
+                    int type_index = grid[i][j].type->index;
                     pos[type_index][index[type_index]].x = i;
                     pos[type_index][index[type_index]].y = j;
                     pos[type_index][index[type_index]].z = k;
@@ -3634,22 +3602,25 @@ static void initial_placement(pad_loc_t pad_loc_type,
         }
     }
 
-    for (iblk = 0; iblk < num_blocks; iblk++) {
+    /* Now assgin location randomly for all blocks */
+    for (iblk = 0; iblk < num_blocks; ++iblk) {
         /* Don't do IOs if the user specifies IOs */
         if (!(block[iblk].type == IO_TYPE && pad_loc_type == USER)) {
-            type_index = block[iblk].type->index;
-            assert(count[type_index] > 0);
-            /* choice >= 0 && choice <= count[type_index] -1 */
-            choice = my_irand(count[type_index] - 1);
-            x = pos[type_index][choice].x;
-            y = pos[type_index][choice].y;
-            z = pos[type_index][choice].z;
+            int type_index = block[iblk].type->index;
+            assert(avail_diff_type_grids[type_index] > 0);
+            /* choice >= 0 && choice <= avail_diff_type_grids[type_index] -1 */
+            int choice = my_irand(avail_diff_type_grids[type_index] - 1);
+            int x = pos[type_index][choice].x;
+            int y = pos[type_index][choice].y;
+            int z = pos[type_index][choice].z;
             grid[x][y].blocks[z] = iblk;
             ++grid[x][y].usage;
 
             /* Ensure randomizer doesn't pick this block again */
-            pos[type_index][choice] = pos[type_index][count[type_index] - 1]; /* overwrite used block position */
-            --count[type_index];
+            /* overwrite used block position */
+            pos[type_index][choice] =
+                pos[type_index][avail_diff_type_grids[type_index] - 1];
+            --avail_diff_type_grids[type_index];
         }
     }
 
@@ -3685,9 +3656,8 @@ static void initial_placement(pad_loc_t pad_loc_type,
 
     free(pos);          /* Free the mapping list */
     free(index);
-    free(count);
+    free(avail_diff_type_grids);
 }
-
 
 /* Frees the structures used to speed up evaluation of the nonlinear   *
  * congestion cost function.                                           */
@@ -4073,7 +4043,7 @@ static void find_fanin_parallel(const int kthread_id)
     }
 } /* end of void find_fanin_parallel(int kthread_id) */
 
-static void tp_init_localvert_grid()
+static void initial_localvert_grid()
 {
     /* grid[col][row] was column-based, but localvert_grid[col][row] was
      * row-based, it vertical to grid. */
@@ -4095,7 +4065,7 @@ static void tp_init_localvert_grid()
             }
         }
     }
-} /* end of void tp_init_localvert_grid() */
+} /* end of void initial_localvert_grid() */
 
 
 /* FIXME, important for update timing parallel */
@@ -4274,8 +4244,8 @@ static void compute_net_slack_full(const int kthread_id,
 
     /* write back the partial timing and Tdel cost to the global variable */
     /* Why did author using these 2 following variables? */
-    partial_results[kthread_id] = *timing_cost;
-    partial_results2[kthread_id] = *delay_cost;
+    partial_timing_results[kthread_id] = *timing_cost;
+    partial_delay_results[kthread_id] = *delay_cost;
 
     barrier_polling(kthread_id);
     /* master thread sums up the partial values */
@@ -4284,8 +4254,8 @@ static void compute_net_slack_full(const int kthread_id,
         *delay_cost = 0.0;
         int thread_idx = 0;
         for (thread_idx = 0; thread_idx < NUM_OF_THREADS; ++thread_idx) {
-            *timing_cost += partial_results[thread_idx];
-            *delay_cost += partial_results2[thread_idx];
+            *timing_cost += partial_timing_results[thread_idx];
+            *delay_cost += partial_delay_results[thread_idx];
         }
 
         *(input_args->timing_cost) = *timing_cost;
@@ -4628,7 +4598,7 @@ static boolean find_to_block_parallel(int x_from,
                                       int ymin, int ymax)
 {
     /* Returns the location to which I want to swap within the range (xmin,ymin) & (xmax,ymax)*/
-    int test;
+    int choice;
     do {
         /* Until (x_to, y_to) different from (x_from, y_from) */
         if (type == IO_TYPE) {
@@ -4639,12 +4609,12 @@ static boolean find_to_block_parallel(int x_from,
                 if (my_irand_parallel(1, kthread_id)) {
                     /*target is located on x = 0*/
                     *x_to = 0;
-                    test = my_irand_parallel(ymax - ymin, kthread_id);
-                    *y_to = max(1, test);
+                    choice = my_irand_parallel(ymax - ymin, kthread_id);
+                    *y_to = max(1, choice);
                 } else {
                     /*target is located on y = 0*/
-                    test = my_irand_parallel(xmax - xmin, kthread_id);
-                    *x_to = max(1, test);
+                    choice = my_irand_parallel(xmax - xmin, kthread_id);
+                    *x_to = max(1, choice);
                     *y_to = 0;
                 }
             } else if (xmax == num_grid_columns + 1 && ymin == 0) {
@@ -4653,12 +4623,12 @@ static boolean find_to_block_parallel(int x_from,
                 if (my_irand_parallel(1, kthread_id)) {
                     /*target is located on x = num_grid_columns + 1*/
                     *x_to = num_grid_columns + 1;
-                    test = my_irand_parallel(ymax - ymin, kthread_id);
-                    *y_to = max(1, test);
+                    choice = my_irand_parallel(ymax - ymin, kthread_id);
+                    *y_to = max(1, choice);
                 } else {
                     /*target is located on y = 0*/
-                    test = xmin + my_irand_parallel(xmax - xmin, kthread_id);
-                    *x_to = min(num_grid_columns, test);
+                    choice = xmin + my_irand_parallel(xmax - xmin, kthread_id);
+                    *x_to = min(num_grid_columns, choice);
                     *y_to = 0;
                 }
             } else if (xmin == 0 && ymax == num_grid_rows + 1) {
@@ -4667,12 +4637,12 @@ static boolean find_to_block_parallel(int x_from,
                 if (my_irand_parallel(1, kthread_id)) {
                     /*target is located on x = 0*/
                     *x_to = 0;
-                    test = ymin + my_irand_parallel(ymax - ymin, kthread_id);
-                    *y_to = min(num_grid_rows, test);
+                    choice = ymin + my_irand_parallel(ymax - ymin, kthread_id);
+                    *y_to = min(num_grid_rows, choice);
                 } else {
                     /*target is located on y = num_grid_rows+1*/
-                    test = my_irand_parallel(xmax - xmin, kthread_id);
-                    *x_to = max(1, test);
+                    choice = my_irand_parallel(xmax - xmin, kthread_id);
+                    *x_to = max(1, choice);
                     *y_to = num_grid_rows + 1;
                 }
             } else if (xmax == num_grid_columns + 1 && ymax == num_grid_rows + 1) {
@@ -4681,12 +4651,12 @@ static boolean find_to_block_parallel(int x_from,
                 if (my_irand_parallel(1, kthread_id)) {
                     /*target is located on x = num_grid_columns + 1*/
                     *x_to = num_grid_columns + 1;
-                    test = ymin + my_irand_parallel(ymax - ymin, kthread_id);
-                    *y_to = min(num_grid_rows, test);
+                    choice = ymin + my_irand_parallel(ymax - ymin, kthread_id);
+                    *y_to = min(num_grid_rows, choice);
                 } else {
                     /*target is located on y = 0*/
-                    test = xmin + my_irand_parallel(xmax - xmin, kthread_id);
-                    *x_to = min(num_grid_columns, test);
+                    choice = xmin + my_irand_parallel(xmax - xmin, kthread_id);
+                    *x_to = min(num_grid_columns, choice);
                     *y_to = num_grid_rows + 1;
                 }
             } else if (xmin == 0 || xmax == num_grid_columns + 1) {

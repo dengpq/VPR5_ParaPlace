@@ -1312,19 +1312,17 @@ draw_rr_pin(int inode,
     /* Draws an IPIN or OPIN rr_node.  Note that the pin can appear on more    *
      * than one side of a clb.  Also note that this routine can change the     *
      * current color to BLACK.                                                 */
-    int ipin, i, j, iside, iclass, ioff;
     double xcen, ycen;
     char str[BUFSIZE];
-    block_type_ptr type;
-    i = rr_node[inode].xlow;
-    j = rr_node[inode].ylow;
-    ipin = rr_node[inode].ptc_num;
-    type = grid[i][j].type;
-    ioff = grid[i][j].offset;
+    int i = rr_node[inode].xlow;
+    int j = rr_node[inode].ylow;
+    int ipin = rr_node[inode].ptc_num;
+    block_type_ptr type = grid[i][j].type;
+    int ioff = grid[i][j].offset;
     setcolor(color);
-    iclass = type->pin_class[ipin];
 
     /* TODO: This is where we can hide fringe physical pins and also identify globals (hide, color, show) */
+    int iside = -1;
     for (iside = 0; iside < 4; iside++) {
         if (type->pinloc[grid[i][j].offset][iside][ipin]) {
             /* Pin exists on this side. */

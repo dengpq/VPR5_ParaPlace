@@ -14,10 +14,10 @@ typedef struct {
 typedef struct {
     t_tedge* out_edges;
     t_tedge* in_edges;
-    int num_edges;
-    int num_parents;
-    double arr_time;
-    double req_time;
+    int      num_edges;
+    int      num_parents;
+    double   arr_time;
+    double   req_time;
 } t_tnode;
 
 /* out_edges: [0..num_edges - 1].  Array of the edges leaving this tnode.    *
@@ -31,7 +31,6 @@ typedef struct {
  * gives a mapping from each t_node to what circuit element it represents.   *
  * I put this info in a separate structure to maximize cache effectiveness,  *
  * since it's not used much.                                                 */
-
 typedef enum {
     INPAD_SOURCE,
     INPAD_OPIN,
@@ -73,10 +72,8 @@ extern int* net_to_driver_tnode;
  * the timing graph, to make breadth-first searches easier.                  */
 extern vector_t* tnodes_at_level;
 extern int num_tnode_levels;    /* Number of levels in the timing graph. */
-
-
-
 /***************** Subroutines exported by this module ***********************/
+
 int alloc_and_load_timing_graph_levels(void);
 
 void check_timing_graph(int num_const_gen,

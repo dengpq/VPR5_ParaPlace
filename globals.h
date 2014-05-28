@@ -42,7 +42,7 @@ extern block_type_ptr IO_TYPE;
 extern block_type_ptr EMPTY_TYPE;
 
 /* This identifies the block_type_ptr of the default logic block */
-extern block_type_ptr FILL_TYPE;
+extern block_type_ptr CLB_TYPE;
 
 /* Total number of type_descriptors */
 extern int num_types;

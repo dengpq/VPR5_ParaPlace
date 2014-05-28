@@ -457,13 +457,13 @@ find_type_col(IN int x)
     boolean match;
     int priority, num_loc;
     block_type_ptr column_type;
-    priority = FILL_TYPE->grid_loc_def[0].priority;
-    column_type = FILL_TYPE;
+    priority = CLB_TYPE->grid_loc_def[0].priority;
+    column_type = CLB_TYPE;
 
     for (i = 0; i < num_types; i++) {
         if (&type_descriptors[i] == IO_TYPE ||
                 &type_descriptors[i] == EMPTY_TYPE ||
-                &type_descriptors[i] == FILL_TYPE) {
+                &type_descriptors[i] == CLB_TYPE) {
             continue;
         }
 

@@ -707,8 +707,7 @@ comp_width(channel_t* chan,
 
 /* After placement, logical pins for subblocks, blocks, and nets must be updated to correspond with physical pins of type */
 /* This function should only be called once */
-void
-post_place_sync(IN int num_blocks,
+void post_place_sync(IN int num_blocks,
                 INOUT const block_t block_list[],
                 INOUT subblock_data_t* subblock_data_ptr)
 {
@@ -732,13 +731,8 @@ post_place_sync(IN int num_blocks,
             inet = block[iblk].nets[j];
 
             if (inet != OPEN && block[iblk].z > 0) {
-                assert(block[iblk].
-                       nets[j +
-                            block[iblk].z * max_num_block_pins] ==
-                       OPEN);
-                block[iblk].nets[j +
-                                 block[iblk].z *
-                                 max_num_block_pins] =
+                assert(block[iblk].nets[j + block[iblk].z * max_num_block_pins] == OPEN);
+                block[iblk].nets[j + block[iblk].z * max_num_block_pins] =
                                      block[iblk].nets[j];
                 block[iblk].nets[j] = OPEN;
 

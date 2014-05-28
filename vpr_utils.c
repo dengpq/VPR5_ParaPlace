@@ -10,12 +10,11 @@
 
 /******************** Subroutine definitions ********************************/
 /* Points the grid structure back to the blocks list */
-void
-sync_grid_to_blocks(IN int num_blocks,
-                    IN const block_t block_list[],
-                    IN int num_grid_columns,
-                    IN int num_grid_rows,
-                    INOUT grid_tile_t** grid)
+void sync_grid_to_blocks(IN int num_blocks,
+                         IN const block_t block_list[],
+                         IN int num_grid_columns,
+                         IN int num_grid_rows,
+                         INOUT grid_tile_t** grid)
 {
     int i, j, k;
 
@@ -24,17 +23,13 @@ sync_grid_to_blocks(IN int num_blocks,
         for (i = 0; i <= (num_grid_columns + 1); ++i) {
             grid[i][j].usage = 0;
 
-            if (grid[i][j].type) {
+            if (grid[i][j].type != NULL) {
                 /* If already allocated, leave it since size doesn't change */
                 if (NULL == grid[i][j].blocks) {
-                    grid[i][j].blocks =
-                        (int*)my_malloc(sizeof(int) *
-                                        grid[i][j].type->
-                                        capacity);
-
+                    grid[i][j].blocks = (int*)my_malloc(sizeof(int) *
+                                                     grid[i][j].type->capacity);
                     /* Set them as unconnected */
-                    for (k = 0; k < grid[i][j].type->capacity;
-                            ++k) {
+                    for (k = 0; k < grid[i][j].type->capacity; ++k) {
                         grid[i][j].blocks[k] = OPEN;
                     }
                 }
@@ -45,10 +40,10 @@ sync_grid_to_blocks(IN int num_blocks,
     /* Go through each block */
     for (i = 0; i < num_blocks; ++i) {
         /* Check range of block coords */
-        if (block[i].x < 0 || block[i].x > (num_grid_columns + 1) ||
-                block[i].y < 0
-                || (block[i].y + block[i].type->height - 1) > (num_grid_rows + 1)
-                || block[i].z < 0 || block[i].z > (block[i].type->capacity)) {
+        if (block[i].x < 0 || block[i].x > (num_grid_columns + 1)
+              || block[i].y < 0
+              || (block[i].y + block[i].type->height - 1) > (num_grid_rows + 1)
+              || block[i].z < 0 || block[i].z > (block[i].type->capacity)) {
             printf(ERRTAG
                    "Block %d is at invalid location (%d, %d, %d)\n",
                    i, block[i].x, block[i].y, block[i].z);
@@ -88,8 +83,7 @@ sync_grid_to_blocks(IN int num_blocks,
 }
 
 /* This function updates the nets list to point back to blocks list */
-void
-sync_nets_to_blocks(IN int num_blocks,
+void sync_nets_to_blocks(IN int num_blocks,
                     IN const block_t block_list[],
                     IN int num_nets,
                     INOUT net_t net_list[])

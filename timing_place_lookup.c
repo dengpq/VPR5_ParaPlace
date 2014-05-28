@@ -325,7 +325,7 @@ load_simplified_device(void)
     /* Backup original globals */
     EMPTY_TYPE_BACKUP = EMPTY_TYPE;
     IO_TYPE_BACKUP = IO_TYPE;
-    FILL_TYPE_BACKUP = FILL_TYPE;
+    FILL_TYPE_BACKUP = CLB_TYPE;
     type_descriptors_backup = type_descriptors;
     num_types_backup = num_types;
     num_types = NUM_TYPES_USED;
@@ -335,12 +335,12 @@ load_simplified_device(void)
     dummy_type_descriptors[0].index = 0;
     dummy_type_descriptors[1] = *IO_TYPE;
     dummy_type_descriptors[1].index = 1;
-    dummy_type_descriptors[2] = *FILL_TYPE;
+    dummy_type_descriptors[2] = *CLB_TYPE;
     dummy_type_descriptors[2].index = 2;
     type_descriptors = dummy_type_descriptors;
     EMPTY_TYPE = &dummy_type_descriptors[0];
     IO_TYPE = &dummy_type_descriptors[1];
-    FILL_TYPE = &dummy_type_descriptors[2];
+    CLB_TYPE = &dummy_type_descriptors[2];
 
     /* Fill in homogeneous core grid info */
     grid_backup = grid;
@@ -358,7 +358,7 @@ load_simplified_device(void)
             } else if (i == 0 || i == num_grid_columns + 1 || j == 0 || j == num_grid_rows + 1) {
                 grid[i][j].type = IO_TYPE;
             } else {
-                grid[i][j].type = FILL_TYPE;
+                grid[i][j].type = CLB_TYPE;
             }
 
             grid[i][j].blocks = (int*)my_malloc(grid[i][j].type->capacity * sizeof(int));
@@ -374,7 +374,7 @@ static void restore_original_device(void)
     /* restore previous globals */
     IO_TYPE = IO_TYPE_BACKUP;
     EMPTY_TYPE = EMPTY_TYPE_BACKUP;
-    FILL_TYPE = FILL_TYPE_BACKUP;
+    CLB_TYPE = FILL_TYPE_BACKUP;
     type_descriptors = type_descriptors_backup;
     num_types = num_types_backup;
 
@@ -519,7 +519,7 @@ alloc_routing_structs(router_opts_t router_opts,
 
     /*must set up dummy blocks for the first pass through to setup locally used opins */
     /* Only one block per tile */
-    assign_locations(FILL_TYPE, 1, 1, 0, FILL_TYPE, num_grid_columns, num_grid_rows, 0);
+    assign_locations(CLB_TYPE, 1, 1, 0, CLB_TYPE, num_grid_columns, num_grid_rows, 0);
 
     clb_opins_used_locally = alloc_route_structs(subblock_data);
 
@@ -781,8 +781,8 @@ compute_delta_fb_to_fb(router_opts_t router_opts,
     int delta_x, delta_y;
     block_type_ptr source_type, sink_type;
 
-    source_type = FILL_TYPE;
-    sink_type = FILL_TYPE;
+    source_type = CLB_TYPE;
+    sink_type = CLB_TYPE;
 
     if (longest_length < 0.5 * (num_grid_columns)) {
         start_x = longest_length;
@@ -905,7 +905,7 @@ compute_delta_io_to_fb(router_opts_t router_opts,
     block_type_ptr source_type, sink_type;
 
     source_type = IO_TYPE;
-    sink_type = FILL_TYPE;
+    sink_type = CLB_TYPE;
 
     delta_inpad_to_clb[0][0] = IMPOSSIBLE;
     delta_inpad_to_clb[num_grid_columns][num_grid_rows] = IMPOSSIBLE;
@@ -955,7 +955,7 @@ compute_delta_fb_to_io(router_opts_t router_opts,
     int delta_x, delta_y;
     block_type_ptr source_type, sink_type;
 
-    source_type = FILL_TYPE;
+    source_type = CLB_TYPE;
     sink_type = IO_TYPE;
 
     delta_clb_to_outpad[0][0] = IMPOSSIBLE;

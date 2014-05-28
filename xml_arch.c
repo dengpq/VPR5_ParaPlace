@@ -662,7 +662,7 @@ static void SetupGridLocations(ezxml_t Locations,
                 }
 
                 Type->grid_loc_def[i].grid_loc_type = FILL;
-                FILL_TYPE = Type;
+                CLB_TYPE = Type;
             } else if (strcmp(Prop, "col") == 0) {
                 Type->grid_loc_def[i].grid_loc_type = COL_REPEAT;
             } else if (strcmp(Prop, "rel") == 0) {
@@ -1414,7 +1414,7 @@ static void ProcessTypes(INOUT ezxml_t Node,
         FreeNode(Prev);
     }
 
-    if (FILL_TYPE == NULL) {
+    if (CLB_TYPE == NULL) {
         printf(ERRTAG "grid location type 'fill' must be specified.\n");
         exit(1);
     }
