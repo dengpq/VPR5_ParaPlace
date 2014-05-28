@@ -1137,28 +1137,6 @@ static boolean is_global_clock(int iblk,
     return  FALSE;
 }  /* end of static boolean is_global_clock(int iblk,) */
 
-/*finds the fanin to a particular node*/
-void find_fanin_parallel(int thread_id)
-{
-    int tnodes_assign_to_thread = ceil((double)num_tnodes / NUM_OF_THREADS);
-    int start_tnode = thread_id * tnodes_assign_to_thread;
-    int finish_tnode = min((thread_id + 1) * tnodes_assign_to_thread, num_tnodes);
-
-    int i = 0;
-    for (i = start_tnode; i < finish_tnode; ++i) {
-        int num_edges = tnode[i].num_edges;
-        t_tedge* tedge = tnode[i].out_edges;
-
-        int iedge = 0;
-        for (iedge = 0; iedge < num_edges; ++iedge) {
-            int to_node = tedge[iedge].to_node;
-            /* FIXME, don't use ++tnode[to_node].num_parents */
-            int counter = tnode[to_node].num_parents++;
-            tnode[to_node].in_edges[counter].to_node = i;
-        }
-    }
-} /* end of void find_fanin_parallel(int thread_id) */
-
 /* Sets the delays of the inter-FB nets to the values specified by          *
 * net_delay[0..num_nets-1][1..num_pins-1].  These net delays should have    *
 * been allocated and loaded with the net_delay routines.  This routine      *

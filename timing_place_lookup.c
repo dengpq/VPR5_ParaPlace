@@ -63,12 +63,10 @@ requires more research */
 
 /*the delta arrays are used to contain the best case routing Tdel */
 /*between different locations on the FPGA. */
-
-
-double** delta_io_to_fb;
-double** delta_fb_to_fb;
-double** delta_fb_to_io;
-double** delta_io_to_io;
+double** delta_inpad_to_clb;
+double** delta_clb_to_clb;
+double** delta_clb_to_outpad;
+double** delta_inpad_to_outpad;
 
 
 /*** Other Global Arrays ******/
@@ -363,14 +361,13 @@ load_simplified_device(void)
                 grid[i][j].type = FILL_TYPE;
             }
 
-            grid[i][j].blocks =
-                my_malloc(grid[i][j].type->capacity * sizeof(int));
+            grid[i][j].blocks = (int*)my_malloc(grid[i][j].type->capacity * sizeof(int));
             grid[i][j].offset = 0;
         }
     }
 }
-static void
-restore_original_device(void)
+
+static void restore_original_device(void)
 {
     int i, j;
 
@@ -393,11 +390,9 @@ restore_original_device(void)
 }
 
 /**************************************/
-static void
-reset_placement(void)
+static void reset_placement(void)
 {
     int i, j, k;
-
     for (i = 0; i <= num_grid_columns + 1; i++) {
         for (j = 0; j <= num_grid_rows + 1; j++) {
             grid[i][j].usage = 0;
@@ -417,7 +412,6 @@ alloc_and_assign_internal_structures(net_t** original_net,
                                      int* original_num_blocks)
 {
     /*allocate new data structures to hold net, and block info */
-
     *original_net = net;
     *original_num_nets = num_nets;
     num_nets = NET_COUNT;
@@ -486,7 +480,6 @@ setup_chan_width(router_opts_t router_opts,
 {
     /*we give plenty of tracks, this increases routability for the */
     /*lookup table generation */
-
     int width_fac, i, max_pins_per_fb;
 
     max_pins_per_fb = 0;
@@ -672,56 +665,56 @@ assign_blocks_and_route_net(block_type_ptr source_type,
 }
 
 /**************************************/
-static void
-alloc_delta_arrays(void)
+static void alloc_delta_arrays(void)
 {
-    int id_x, id_y;
-
-    delta_fb_to_fb =
-        (double**)alloc_matrix(0, num_grid_columns - 1, 0, num_grid_rows - 1, sizeof(double));
-    delta_io_to_fb = (double**)alloc_matrix(0, num_grid_columns, 0, num_grid_rows, sizeof(double));
-    delta_fb_to_io = (double**)alloc_matrix(0, num_grid_columns, 0, num_grid_rows, sizeof(double));
-    delta_io_to_io =
-        (double**)alloc_matrix(0, num_grid_columns + 1, 0, num_grid_rows + 1, sizeof(double));
+    delta_clb_to_clb = (double**)alloc_matrix(0, num_grid_columns - 1,
+                                              0, num_grid_rows - 1,
+                                              sizeof(double));
+    delta_inpad_to_clb = (double**)alloc_matrix(0, num_grid_columns,
+                                                0, num_grid_rows,
+                                                sizeof(double));
+    delta_clb_to_outpad = (double**)alloc_matrix(0, num_grid_columns,
+                                                 0, num_grid_rows,
+                                                 sizeof(double));
+    delta_inpad_to_outpad = (double**)alloc_matrix(0, num_grid_columns + 1,
+                                                   0, num_grid_rows + 1,
+                                                   sizeof(double));
 
 
     /*initialize all of the array locations to -1 */
-
+    int id_x, id_y;
     for (id_x = 0; id_x <= num_grid_columns; id_x++) {
         for (id_y = 0; id_y <= num_grid_rows; id_y++) {
-            delta_io_to_fb[id_x][id_y] = IMPOSSIBLE;
+            delta_inpad_to_clb[id_x][id_y] = IMPOSSIBLE;
         }
     }
 
     for (id_x = 0; id_x <= num_grid_columns - 1; id_x++) {
         for (id_y = 0; id_y <= num_grid_rows - 1; id_y++) {
-            delta_fb_to_fb[id_x][id_y] = IMPOSSIBLE;
+            delta_clb_to_clb[id_x][id_y] = IMPOSSIBLE;
         }
     }
 
     for (id_x = 0; id_x <= num_grid_columns; id_x++) {
         for (id_y = 0; id_y <= num_grid_rows; id_y++) {
-            delta_fb_to_io[id_x][id_y] = IMPOSSIBLE;
+            delta_clb_to_outpad[id_x][id_y] = IMPOSSIBLE;
         }
     }
 
     for (id_x = 0; id_x <= num_grid_columns + 1; id_x++) {
         for (id_y = 0; id_y <= num_grid_rows + 1; id_y++) {
-            delta_io_to_io[id_x][id_y] = IMPOSSIBLE;
+            delta_inpad_to_outpad[id_x][id_y] = IMPOSSIBLE;
         }
     }
 }
 
 /**************************************/
-static void
-free_delta_arrays(void)
+static void free_delta_arrays(void)
 {
-
-    free_matrix(delta_io_to_fb, 0, num_grid_columns, 0, sizeof(double));
-    free_matrix(delta_fb_to_fb, 0, num_grid_columns - 1, 0, sizeof(double));
-    free_matrix(delta_fb_to_io, 0, num_grid_columns, 0, sizeof(double));
-    free_matrix(delta_io_to_io, 0, num_grid_columns + 1, 0, sizeof(double));
-
+    free_matrix(delta_inpad_to_clb, 0, num_grid_columns, 0, sizeof(double));
+    free_matrix(delta_clb_to_clb, 0, num_grid_columns - 1, 0, sizeof(double));
+    free_matrix(delta_clb_to_outpad, 0, num_grid_columns, 0, sizeof(double));
+    free_matrix(delta_inpad_to_outpad, 0, num_grid_columns + 1, 0, sizeof(double));
 }
 
 /**************************************/
@@ -817,11 +810,11 @@ compute_delta_fb_to_fb(router_opts_t router_opts,
             delta_y = abs(sink_y - source_y);
 
             if (delta_x == 0 && delta_y == 0) {
-                delta_fb_to_fb[delta_x][delta_y] = 0.0;
+                delta_clb_to_clb[delta_x][delta_y] = 0.0;
                 continue;
             }
 
-            delta_fb_to_fb[delta_x][delta_y] =
+            delta_clb_to_clb[delta_x][delta_y] =
                 assign_blocks_and_route_net(source_type, source_x,
                                             source_y, sink_type,
                                             sink_x, sink_y,
@@ -841,7 +834,7 @@ compute_delta_fb_to_fb(router_opts_t router_opts,
             delta_x = abs(sink_x - source_x);
             delta_y = abs(sink_y - source_y);
 
-            delta_fb_to_fb[delta_x][delta_y] =
+            delta_clb_to_clb[delta_x][delta_y] =
                 assign_blocks_and_route_net(source_type, source_x,
                                             source_y, sink_type,
                                             sink_x, sink_y,
@@ -856,7 +849,7 @@ compute_delta_fb_to_fb(router_opts_t router_opts,
             delta_x = abs(sink_x - source_x);
             delta_y = abs(sink_y - source_y);
 
-            delta_fb_to_fb[delta_x][delta_y] =
+            delta_clb_to_clb[delta_x][delta_y] =
                 assign_blocks_and_route_net(source_type, source_x,
                                             source_y, sink_type,
                                             sink_x, sink_y,
@@ -876,7 +869,7 @@ compute_delta_fb_to_fb(router_opts_t router_opts,
         delta_x = abs(sink_x - source_x);
         delta_y = abs(sink_y - source_y);
 
-        delta_fb_to_fb[delta_x][delta_y] =
+        delta_clb_to_clb[delta_x][delta_y] =
             assign_blocks_and_route_net(source_type, source_x, source_y,
                                         sink_type, sink_x, sink_y,
                                         router_opts, det_routing_arch,
@@ -892,7 +885,7 @@ compute_delta_fb_to_fb(router_opts_t router_opts,
         delta_x = abs(sink_x - source_x);
         delta_y = abs(sink_y - source_y);
 
-        delta_fb_to_fb[delta_x][delta_y] =
+        delta_clb_to_clb[delta_x][delta_y] =
             assign_blocks_and_route_net(source_type, source_x, source_y,
                                         sink_type, sink_x, sink_y,
                                         router_opts, det_routing_arch,
@@ -914,8 +907,8 @@ compute_delta_io_to_fb(router_opts_t router_opts,
     source_type = IO_TYPE;
     sink_type = FILL_TYPE;
 
-    delta_io_to_fb[0][0] = IMPOSSIBLE;
-    delta_io_to_fb[num_grid_columns][num_grid_rows] = IMPOSSIBLE;
+    delta_inpad_to_clb[0][0] = IMPOSSIBLE;
+    delta_inpad_to_clb[num_grid_columns][num_grid_rows] = IMPOSSIBLE;
 
     source_x = 0;
     source_y = 1;
@@ -924,7 +917,7 @@ compute_delta_io_to_fb(router_opts_t router_opts,
     end_x = num_grid_columns;
     start_y = 1;
     end_y = num_grid_rows;
-    generic_compute_matrix(&delta_io_to_fb, source_type, sink_type,
+    generic_compute_matrix(&delta_inpad_to_clb, source_type, sink_type,
                            source_x, source_y, start_x, end_x, start_y,
                            end_y, router_opts, det_routing_arch,
                            segment_inf, timing_inf);
@@ -936,7 +929,7 @@ compute_delta_io_to_fb(router_opts_t router_opts,
     end_x = 1;
     start_y = 1;
     end_y = num_grid_rows;
-    generic_compute_matrix(&delta_io_to_fb, source_type, sink_type,
+    generic_compute_matrix(&delta_inpad_to_clb, source_type, sink_type,
                            source_x, source_y, start_x, end_x, start_y,
                            end_y, router_opts, det_routing_arch,
                            segment_inf, timing_inf);
@@ -945,7 +938,7 @@ compute_delta_io_to_fb(router_opts_t router_opts,
     end_x = num_grid_columns;
     start_y = num_grid_rows;
     end_y = num_grid_rows;
-    generic_compute_matrix(&delta_io_to_fb, source_type, sink_type,
+    generic_compute_matrix(&delta_inpad_to_clb, source_type, sink_type,
                            source_x, source_y, start_x, end_x, start_y,
                            end_y, router_opts, det_routing_arch,
                            segment_inf, timing_inf);
@@ -965,8 +958,8 @@ compute_delta_fb_to_io(router_opts_t router_opts,
     source_type = FILL_TYPE;
     sink_type = IO_TYPE;
 
-    delta_fb_to_io[0][0] = IMPOSSIBLE;
-    delta_fb_to_io[num_grid_columns][num_grid_rows] = IMPOSSIBLE;
+    delta_clb_to_outpad[0][0] = IMPOSSIBLE;
+    delta_clb_to_outpad[num_grid_columns][num_grid_rows] = IMPOSSIBLE;
 
     sink_x = 0;
     sink_y = 1;
@@ -976,7 +969,7 @@ compute_delta_fb_to_io(router_opts_t router_opts,
             delta_x = abs(source_x - sink_x);
             delta_y = abs(source_y - sink_y);
 
-            delta_fb_to_io[delta_x][delta_y] =
+            delta_clb_to_outpad[delta_x][delta_y] =
                 assign_blocks_and_route_net(source_type, source_x,
                                             source_y, sink_type,
                                             sink_x, sink_y,
@@ -993,7 +986,7 @@ compute_delta_fb_to_io(router_opts_t router_opts,
 
     for (source_y = 1; source_y <= num_grid_rows; source_y++) {
         delta_y = abs(source_y - sink_y);
-        delta_fb_to_io[delta_x][delta_y] =
+        delta_clb_to_outpad[delta_x][delta_y] =
             assign_blocks_and_route_net(source_type, source_x, source_y,
                                         sink_type, sink_x, sink_y,
                                         router_opts, det_routing_arch,
@@ -1007,7 +1000,7 @@ compute_delta_fb_to_io(router_opts_t router_opts,
 
     for (source_x = 2; source_x <= num_grid_columns; source_x++) {
         delta_x = abs(source_x - sink_x);
-        delta_fb_to_io[delta_x][delta_y] =
+        delta_clb_to_outpad[delta_x][delta_y] =
             assign_blocks_and_route_net(source_type, source_x, source_y,
                                         sink_type, sink_x, sink_y,
                                         router_opts, det_routing_arch,
@@ -1029,12 +1022,12 @@ compute_delta_io_to_io(router_opts_t router_opts,
     source_type = IO_TYPE;
     sink_type = IO_TYPE;
 
-    delta_io_to_io[0][0] = 0;   /*Tdel to itself is 0 (this can happen) */
-    delta_io_to_io[num_grid_columns + 1][num_grid_rows + 1] = IMPOSSIBLE;
-    delta_io_to_io[0][num_grid_rows] = IMPOSSIBLE;
-    delta_io_to_io[num_grid_columns][0] = IMPOSSIBLE;
-    delta_io_to_io[num_grid_columns][num_grid_rows + 1] = IMPOSSIBLE;
-    delta_io_to_io[num_grid_columns + 1][num_grid_rows] = IMPOSSIBLE;
+    delta_inpad_to_outpad[0][0] = 0;   /*Tdel to itself is 0 (this can happen) */
+    delta_inpad_to_outpad[num_grid_columns + 1][num_grid_rows + 1] = IMPOSSIBLE;
+    delta_inpad_to_outpad[0][num_grid_rows] = IMPOSSIBLE;
+    delta_inpad_to_outpad[num_grid_columns][0] = IMPOSSIBLE;
+    delta_inpad_to_outpad[num_grid_columns][num_grid_rows + 1] = IMPOSSIBLE;
+    delta_inpad_to_outpad[num_grid_columns + 1][num_grid_rows] = IMPOSSIBLE;
 
 
     source_x = 0;
@@ -1045,7 +1038,7 @@ compute_delta_io_to_io(router_opts_t router_opts,
 
     for (sink_y = 2; sink_y <= num_grid_rows; sink_y++) {
         delta_y = abs(sink_y - source_y);
-        delta_io_to_io[delta_x][delta_y] =
+        delta_inpad_to_outpad[delta_x][delta_y] =
             assign_blocks_and_route_net(source_type, source_x, source_y,
                                         sink_type, sink_x, sink_y,
                                         router_opts, det_routing_arch,
@@ -1060,7 +1053,7 @@ compute_delta_io_to_io(router_opts_t router_opts,
 
     for (sink_y = 1; sink_y <= num_grid_rows; sink_y++) {
         delta_y = abs(sink_y - source_y);
-        delta_io_to_io[delta_x][delta_y] =
+        delta_inpad_to_outpad[delta_x][delta_y] =
             assign_blocks_and_route_net(source_type, source_x, source_y,
                                         sink_type, sink_x, sink_y,
                                         router_opts, det_routing_arch,
@@ -1076,7 +1069,7 @@ compute_delta_io_to_io(router_opts_t router_opts,
 
     for (sink_x = 2; sink_x <= num_grid_columns; sink_x++) {
         delta_x = abs(sink_x - source_x);
-        delta_io_to_io[delta_x][delta_y] =
+        delta_inpad_to_outpad[delta_x][delta_y] =
             assign_blocks_and_route_net(source_type, source_x, source_y,
                                         sink_type, sink_x, sink_y,
                                         router_opts, det_routing_arch,
@@ -1091,7 +1084,7 @@ compute_delta_io_to_io(router_opts_t router_opts,
 
     for (sink_x = 1; sink_x <= num_grid_columns; sink_x++) {
         delta_x = abs(sink_x - source_x);
-        delta_io_to_io[delta_x][delta_y] =
+        delta_inpad_to_outpad[delta_x][delta_y] =
             assign_blocks_and_route_net(source_type, source_x, source_y,
                                         sink_type, sink_x, sink_y,
                                         router_opts, det_routing_arch,
@@ -1106,7 +1099,7 @@ compute_delta_io_to_io(router_opts_t router_opts,
         for (sink_x = 1; sink_x <= num_grid_columns; sink_x++) {
             delta_y = abs(source_y - sink_y);
             delta_x = abs(source_x - sink_x);
-            delta_io_to_io[delta_x][delta_y] =
+            delta_inpad_to_outpad[delta_x][delta_y] =
                 assign_blocks_and_route_net(source_type, source_x,
                                             source_y, sink_type,
                                             sink_x, sink_y,
@@ -1155,32 +1148,32 @@ compute_delta_arrays(router_opts_t router_opts,
 {
 
     printf
-    ("Computing delta_io_to_io lookup matrix, may take a few seconds, please wait...\n");
+    ("Computing delta_inpad_to_outpad lookup matrix, may take a few seconds, please wait...\n");
     compute_delta_io_to_io(router_opts, det_routing_arch, segment_inf,
                            timing_inf);
     printf
-    ("Computing delta_io_to_fb lookup matrix, may take a few seconds, please wait...\n");
+    ("Computing delta_inpad_to_clb> lookup matrix, may take a few seconds, please wait...\n");
     compute_delta_io_to_fb(router_opts, det_routing_arch, segment_inf,
                            timing_inf);
     printf
-    ("Computing delta_fb_to_io lookup matrix, may take a few seconds, please wait...\n");
+    ("Computing delta_clb_to_outpad> lookup matrix, may take a few seconds, please wait...\n");
     compute_delta_fb_to_io(router_opts, det_routing_arch, segment_inf,
                            timing_inf);
     printf
-    ("Computing delta_fb_to_fb lookup matrix, may take a few seconds, please wait...\n");
+    ("Computing delta_clb_to_clb lookup matrix, may take a few seconds, please wait...\n");
     compute_delta_fb_to_fb(router_opts, det_routing_arch, segment_inf,
                            timing_inf, longest_length);
 
 #ifdef PRINT_ARRAYS
     lookup_dump = my_fopen(DUMPFILE, "w");
-    fprintf(lookup_dump, "\n\nprinting delta_fb_to_fb\n");
-    print_array(delta_fb_to_fb, 0, num_grid_columns - 1, 0, num_grid_rows - 1);
-    fprintf(lookup_dump, "\n\nprinting delta_io_to_fb\n");
-    print_array(delta_io_to_fb, 0, num_grid_columns, 0, num_grid_rows);
-    fprintf(lookup_dump, "\n\nprinting delta_fb_to_io\n");
-    print_array(delta_fb_to_io, 0, num_grid_columns, 0, num_grid_rows);
-    fprintf(lookup_dump, "\n\nprinting delta_io_to_io\n");
-    print_array(delta_io_to_io, 0, num_grid_columns + 1, 0, num_grid_rows + 1);
+    fprintf(lookup_dump, "\n\nprinting delta_clb_to_clb\n");
+    print_array(delta_clb_to_clb, 0, num_grid_columns - 1, 0, num_grid_rows - 1);
+    fprintf(lookup_dump, "\n\nprinting delta_inpad_to_clb>\n");
+    print_array(delta_inpad_to_clb>, 0, num_grid_columns, 0, num_grid_rows);
+    fprintf(lookup_dump, "\n\nprinting delta_clb_to_outpad>\n");
+    print_array(delta_clb_to_outpad>, 0, num_grid_columns, 0, num_grid_rows);
+    fprintf(lookup_dump, "\n\nprinting delta_inpad_to_outpad\n");
+    print_array(delta_inpad_to_outpad, 0, num_grid_columns + 1, 0, num_grid_rows + 1);
     fclose(lookup_dump);
 #endif
 
@@ -1189,15 +1182,13 @@ compute_delta_arrays(router_opts_t router_opts,
 /******* Globally Accessable Functions **********/
 
 /**************************************/
-void
-compute_delay_lookup_tables(router_opts_t router_opts,
-                            detail_routing_arch_t det_routing_arch,
-                            segment_info_t* segment_inf,
-                            timing_info_t timing_inf,
-                            chan_width_distr_t chan_width_dist,
-                            subblock_data_t subblock_data)
+void compute_delay_lookup_tables(router_opts_t router_opts,
+                                 detail_routing_arch_t det_routing_arch,
+                                 segment_info_t* segment_inf,
+                                 timing_info_t timing_inf,
+                                 chan_width_distr_t chan_width_dist,
+                                 subblock_data_t subblock_data)
 {
-
     static net_t* original_net;  /*this will be used as a pointer to remember what */
 
     /*the "real" nets in the circuit are. This is    */

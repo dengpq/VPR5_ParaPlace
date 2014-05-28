@@ -72,7 +72,11 @@ int y_partition[64] = {
 /*****************************************************************************
  *       The following function were designed for Parallel Placememt         *
  ****************************************************************************/
-static void* try_place_parallel(void* args);
+static void barrier_polling(int thread_id);
+
+static void barrier_polling_reset(void);
+
+static void* try_place_parallel(pthread_data_t* args);
 
 static void  try_place_a_subregion(const int  kthread_id,
                                    const int  krow,
@@ -83,81 +87,68 @@ static void  try_place_a_subregion(const int  kthread_id,
                                    thread_local_data_for_swap_t* swap_data_ptr);
 
 /* try_place_parallel directed-called functions */
-static void tp_initialize(pthread_data_t*  input_args,
-                          int*  max_pins_per_fb,
-                          thread_local_common_paras_t*  common_paras_ptr);
+static void initial_common_paras(pthread_data_t*  input_args,
+                                 int*  max_pins_per_fb,
+                                 thread_local_common_paras_t* common_paras_ptr);
 
-static void tp_alloc_mem(const int max_pins_per_fb,
-                         const placer_opts_t placer_opts,
-                         thread_local_data_for_swap_t* swap_data_ptr);
+static void alloc_memory_for_swap_data(const int max_pins_per_fb,
+                                       thread_local_common_paras_t*  common_paras_ptr,
+                                       thread_local_data_for_swap_t* swap_data_ptr);
 
+static void initial_swap_data(thread_local_common_paras_t*  common_paras_ptr,
+                              thread_local_data_for_swap_t*  swap_data_ptr);
 
-static void tp_init_local(const int* region_x_boundary,
-                          thread_local_data_for_swap_t*  swap_data_ptr);
+static void find_fanin_parallel(const int kthread_id);
 
-static void tp_init_localvert_grid();
+static void tp_init_localvert_grid(void);
 
-static void tp_timing_update_full(int thread_id,
-                                  double*** net_delay,
-                                  pthread_data_t* input_args,
-                                  double*  max_delay);
+static void perform_timing_analyze_parallel(const int thread_id,
+                                            double*** net_delay,
+                                            pthread_data_t* input_args,
+                                            double*  max_delay);
 
-static void tp_compute_net_slack(int thread_id,
-                                 double*** net_slack,
-                                 double*   timing_cost,
-                                 double*   delay_cost,
-                                 double    crit_exponent,
-                                 double    max_delay,
-                                 pthread_data_t* input_args);
+static void compute_net_slack_full(const int kthread_id,
+                                   double*** net_slack,
+                                   double*   timing_cost,
+                                   double*   delay_cost,
+                                   double    crit_exponent,
+                                   double    max_delay,
+                                   pthread_data_t* input_args);
 
-static void tp_timing_calc(int thread_id,
-                           double* timing_cost,
-                           double* delay_cost,
-                           pthread_data_t* input_args);
+static void calculate_timing_without_update_crit(const int thread_id,
+                                                 double* timing_cost,
+                                                 double* delay_cost,
+                                                 pthread_data_t* input_args);
 
-static void tp_iter_data_update(const int kiter,
-                                pthread_data_t* input_args,
-                                thread_local_common_paras_t*  common_paras_ptr,
-                                thread_local_data_for_swap_t* swap_data_ptr);
+static void iter_data_update_from_global_to_local_grid(const int kiter,
+                                                       pthread_data_t* input_args,
+                                                       thread_local_common_paras_t*  common_paras_ptr,
+                                                       thread_local_data_for_swap_t* swap_data_ptr);
 
-static void balance_two_consecutive_threads_edge(int thread_id);
+static void balance_two_consecutive_threads_edge(const int kthread_id);
 
-static void balance_two_consecutive_threads_sinks(int thread_id);
+static void balance_two_consecutive_threads_sinks(const int kthread_id);
 
-static void comp_delta_td_cost_parallel(int from_block,
-                                        int to_block,
-                                        int num_of_pins,
-                                        double* delta_timing,
-                                        double* delta_delay,
-                                        local_block_t* local_block,
-                                        double** local_temp_point_to_point_timing_cost,
-                                        double** local_temp_point_to_point_delay_cost);
-
-static void tp_local_data_update(const int* region_x_boundary,
-                                 const int* region_y_boundary,
-                                 grid_tile_t** local_grid, local_block_t* local_block,
-                                 const int krow, const int kcol);
+static double compute_bb_cost_parallel(const int kstart_net,
+                                       const int kend_net);
 
 /* try swap a pair of blocks in each Extend-SubRegion by each thread parallely */
-static int  try_swap_parallel(const double t,
-                              const int  kthread_id,
-                              const int  x_from,
-                              const int  y_from,
-                              const int  z_from,
-                              const int  from_block,
-                              const int  place_cost_type,
-                              const place_algorithm_t place_algorithm,
-                              const double timing_tradeoff,
-                              double*  total_cost,
-                              double*  bb_cost,
-                              double*  timing_cost,
-                              double*  delay_cost,
-                              double  inverse_prev_bb_cost,
-                              double  inverse_prev_timing_cost,
-                              double  range_limit,
-                              int xMin, int xMax,
-                              int yMin, int yMax,
+static int  try_swap_parallel(const double kt,
+                              const int kthread_id,
+                              const int kx_from,
+                              const int ky_from,
+                              const int kz_from,
+                              const int krow,
+                              const int kcol,
+                              thread_local_common_paras_t*  common_paras_ptr,
                               thread_local_data_for_swap_t* swap_data_ptr);
+
+static int find_affected_nets_parallel(int* nets_to_update,
+                                       int* net_block_moved,
+                                       int from_block,
+                                       int to_block,
+                                       int num_of_pins,
+                                       double* local_temp_net_cost);
 
 static void get_bb_from_scratch_parallel(int inet,
                                          bbox_t* coords,
@@ -167,6 +158,19 @@ static void get_bb_from_scratch_parallel(int inet,
 static void get_non_updateable_bb_parallel(int inet,
                                            bbox_t* bb_coord_new,
                                            local_block_t* local_block);
+
+static void compute_delta_td_cost_parallel(const int kfrom_block,
+                                           const int kto_block,
+                                           int num_of_pins,
+                                           double*  delta_timing,
+                                           double*  delta_delay,
+                                           local_block_t* local_block,
+                                           double** local_temp_point_to_point_timing_cost,
+                                           double** local_temp_point_to_point_delay_cost);
+
+static int assess_swap_parallel(double delta_c,
+                                double t,
+                                int local_seed);
 
 static void update_bb_parallel(int inet,
                                bbox_t* local_bb_coord,
@@ -188,22 +192,24 @@ static boolean find_to_block_parallel(int x_from,
                                       int xmin, int xmax,
                                       int ymin, int ymax);
 
-static int find_affected_nets_parallel(int* nets_to_update,
-                                       int* net_block_moved,
-                                       int from_block,
-                                       int to_block,
-                                       int num_of_pins,
-                                       double* local_temp_net_cost);
-
-static int assess_swap_parallel(double delta_c,
-                                double t,
-                                int local_seed);
-
 /* 4 functions for data broadcast*/
 static void update_from_local_to_global(local_block_t* local_block,
                                         grid_tile_t** local_grid,
                                         int x_start, int x_end,
                                         int y_start, int y_end);
+
+static void update_from_global_to_local_grid_only(grid_tile_t** local_grid,
+                                                  const int x_start,
+                                                  const int x_end,
+                                                  const int y_start,
+                                                  const int y_end);
+
+static void update_local_data_from_global(const int* region_x_boundary,
+                                          const int* region_y_boundary,
+                                          grid_tile_t** local_grid,
+                                          local_block_t* local_block,
+                                          const int krow,
+                                          const int kcol);
 
 static void update_from_global_to_local_hori(local_block_t* local_block,
                                              grid_tile_t** local_grid,
@@ -215,11 +221,12 @@ static void update_from_global_to_local_vert(local_block_t* local_block,
                                              int x_start, int x_end,
                                              int y_start, int y_end);
 
-static void update_from_global_to_local_grid_only(grid_tile_t** local_grid,
-                                                  const int x_start,
-                                                  const int x_end,
-                                                  const int y_start,
-                                                  const int y_end);
+static void update_t_parallel(double* t,
+                              int* inner_iter_num,
+                              double range_limit,
+                              double success_rat,
+                              annealing_sched_t annealing_sched);
+
 /* calculates the time difference*/
 static double my_difftime2(struct timeval* start,
                            struct timeval* end);
@@ -358,9 +365,6 @@ static void alloc_and_load_for_fast_cost_update(double place_cost_exp);
 static void initial_placement(pad_loc_t pad_loc_type,
                               char* pad_loc_file);
 
-static double comp_bb_cost_parallel(int start_net,
-                                    int end_net);
-
 static double comp_bb_cost(int method,
                            int place_cost_type,
                            int num_regions);
@@ -406,12 +410,6 @@ static double starting_t(double* cost_ptr,
                         double inverse_prev_bb_cost,
                         double inverse_prev_timing_cost,
                         double* delay_cost_ptr);
-
-static void update_t_parallel(double* t,
-                              int* inner_iter_num,
-                              double range_limit,
-                              double success_rat,
-                              annealing_sched_t annealing_sched);
 
 static void update_rlim(double* range_limit,
                         double success_rat);
@@ -516,29 +514,11 @@ static void get_bb_from_scratch(int inet,
 static double get_net_wirelength_estimate(int inet,
                                           bbox_t* bbptr);
 /*===================   ORIGIN Functions in old vpr4.3    ===============*/
-
-static void tp_data_print_to_screen(int thread_id,
-                             double* timing_cost,
-                             double* delay_cost,
-                             double* crit_exponent,
-                             double max_delay,
-                             pthread_data_t* input_args,
-                             placer_opts_t placer_opts,
-                             double* cost,
-                             double* bb_cost,
-                             int* success_sum,
-                             double* sum_of_squares,
-                             int* move_counter,
-                             int* tot_iter, double* success_rat,
-                             double* av_cost, double* av_bb_cost,
-                             double* av_timing_cost,
-                             double* av_delay_cost, double* std_dev,
-                             double* range_limit,
-                             double* final_rlim,
-                             double* inverse_delta_rlim,
-                             double* t,
-                             double* oldt, int* inner_iter_num,
-                             double place_delay_value);
+static void update_and_print_common_paras(const int kthread_id,
+                                          int* move_counter_ptr,
+                                          int* inner_iter_num_ptr,
+                                          pthread_data_t*  input_args,
+                                          thread_local_common_paras_t* common_paras_ptr);
 
 /***********************************************************************/
 /* RESEARCH TODO: Bounding Box and range_limit need to be redone for    *
@@ -603,7 +583,8 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
                                      &old_region_occ_y,
                                      placer_opts);
 
-    initial_placement(placer_opts.pad_loc_type, placer_opts.pad_loc_file);
+    initial_placement(placer_opts.pad_loc_type,
+                      placer_opts.pad_loc_file);
     init_draw_coords((double)width_fac);
 
     /* Storing the number of pins on each type of block makes the swap routine *
@@ -650,16 +631,19 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
         }
 
         if (placer_opts.place_algorithm == PATH_TIMING_DRIVEN_PLACE) {
-        /* This keeps net_delay up to date with the same values that * 
+        /* This keeps net_delay up to date with the same values that *
          * the placer is using point_to_point_delay_cost is computed *
          * each that comp_td_costs is called, and is also updated    *
          * after any swap is accepted   */
-            net_delay = point_to_point_delay_cost;  
+            net_delay = point_to_point_delay_cost;
         }
 
         load_timing_graph_net_delays(net_delay);
         max_delay = load_net_slack(net_slack, 0);
-        load_criticalities(placer_opts, net_slack, max_delay, crit_exponent);
+        load_criticalities(placer_opts,
+                           net_slack,
+                           max_delay,
+                           crit_exponent);
 
         /*now we can properly compute costs  */
         comp_td_costs(&timing_cost,
@@ -898,7 +882,8 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
                 timing_place_crit[inet][ipin] = 0;    /*dummy crit values */
             }
 
-        comp_td_costs(&timing_cost, &delay_cost);   /*computes point_to_point_delay_cost */
+        comp_td_costs(&timing_cost,
+                      &delay_cost);  /*computes point_to_point_delay_cost */
     }
 
     double place_est_crit_delay = 0.0;
@@ -982,7 +967,7 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
  *             / \  /\
  *            4  5 6  7
  */
-void barrier_polling(int kthread_id)
+static void barrier_polling(int kthread_id)
 {
     ++(barrier1[kthread_id].entry);
 
@@ -1037,7 +1022,7 @@ void barrier_polling(int kthread_id)
     } /* end of else */
 }  /* end of void barrier_polling(int kthread_id) */
 
-void barrier_polling_reset()
+static void barrier_polling_reset(void)
 {
     int x = -1;
     for (x = 0; x < NUM_OF_THREADS; ++x) {
@@ -1047,12 +1032,9 @@ void barrier_polling_reset()
     }
 } /* end of void barrier_polling_reset() */
 
-
 /* Placement using multi-threads parallely */
-static void* try_place_parallel(void* args)
+static void* try_place_parallel(pthread_data_t* input_args)
 {
-    pthread_data_t* input_args = (pthread_data_t*)args;
-
     int core_affinity = pow(2,
                             input_args->thread_id);
     /*core affinity - locking threads to a particular core*/
@@ -1066,20 +1048,20 @@ static void* try_place_parallel(void* args)
 
     thread_local_common_paras_t  common_paras;
     int max_pins_per_fb = 0;
-    /* tp_initialize() initial all thread_data variables */
-    tp_initialize(input_args,
-                  &max_pins_per_fb,
-                  &common_paras);
+    /* initial_common_paras() initial all thread_data variables */
+    initial_common_paras(input_args,
+                         &max_pins_per_fb,
+                         &common_paras);
 
     thread_local_data_for_swap_t  swap_data;
-    /* allocate space for local data */ 
-    tp_alloc_mem(max_pins_per_fb,
-                 common_paras.local_placer_opts,
-                 &swap_data);
+    /* allocate memory for swap_data */
+    alloc_memory_for_swap_data(max_pins_per_fb,
+                               &common_paras,
+                               &swap_data);
 
-    /* Initial all the 7 local parameters */ 
-    tp_init_local(common_paras.local_region_x_boundary,
-                  &swap_data);
+    /* Initial 6 member variables in swap_data */
+    initial_swap_data(&common_paras,
+                      &swap_data);
 
     const int kthread_id = common_paras.local_thread_id;
     /* build the fan-in tree for each node for timing update */
@@ -1100,7 +1082,7 @@ static void* try_place_parallel(void* args)
     int prob = PROB; /* 10 */
     int timing_update_threshold = TIMING_UPDATE; /* 5 */
     /* ensures timing update will occurduring first iteration */
-    int freq = timing_update_threshold; 
+    int freq = timing_update_threshold;
 
     /*=========    NOW STARTING MAIN PLACEMENT  =======*/
     int iter = 0;
@@ -1126,18 +1108,18 @@ static void* try_place_parallel(void* args)
              * 'timing_update_threadhold' iterations */
             if (freq >= timing_update_threshold) {
                 /* It first calculate all tnodes arr_time and req_time parallel */
-                tp_timing_update_full(kthread_id,
-                                      &(common_paras.local_net_delay),
-                                      input_args,
-                                      &(common_paras.local_max_delay));
+                perform_timing_analyze_parallel(kthread_id,
+                                                &(common_paras.local_net_delay),
+                                                input_args,
+                                                &(common_paras.local_max_delay));
                 /* then calculate all timing_edge' slack value. */
-                tp_compute_net_slack(kthread_id,
-                                     &(common_paras.local_net_slack),
-                                     &(common_paras.local_timing_cost),
-                                     &(common_paras.local_delay_cost),
-                                     common_paras.local_crit_exponent,
-                                     common_paras.local_max_delay,
-                                     input_args);
+                compute_net_slack_full(kthread_id,
+                                       &(common_paras.local_net_slack),
+                                       &(common_paras.local_timing_cost),
+                                       &(common_paras.local_delay_cost),
+                                       common_paras.local_crit_exponent,
+                                       common_paras.local_max_delay,
+                                       input_args);
 
                 /*reset frequency counter*/
                 freq = 0;
@@ -1154,20 +1136,19 @@ static void* try_place_parallel(void* args)
                 }
 
                 /* no criticality update, but still need to recalculate timing */
-                tp_timing_calc(kthread_id,
-                               &(common_paras.local_timing_cost),
-                               &(common_paras.local_delay_cost),
-                               input_args);
+                calculate_timing_without_update_crit(kthread_id,
+                                                     &(common_paras.local_timing_cost),
+                                                     &(common_paras.local_delay_cost),
+                                                     input_args);
                 ++freq;
             }
 
             barrier_polling(kthread_id);
 
-            tp_iter_data_update(iter,
-                                input_args,
-                                &common_paras,
-                                &swap_data);
-
+            iter_data_update_from_global_to_local_grid(iter,
+                                                       input_args,
+                                                       &common_paras,
+                                                       &swap_data);
             /* clear local counters. But why? */
             if (iter == 0) {
                 common_paras.local_success_sum = 0;
@@ -1205,11 +1186,10 @@ static void* try_place_parallel(void* args)
 
             /*bb cost update
              *parallel calculation followed by serial addition in order to avoid
-             *floating point roundoff error
-             */
+             *floating point roundoff error */
             double wirelength_cost =
-                comp_bb_cost_parallel(start_finish_nets[kthread_id].start_sinks,
-                                      start_finish_nets[kthread_id].finish_sinks);
+                compute_bb_cost_parallel(start_finish_nets[kthread_id].start_sinks,
+                                         start_finish_nets[kthread_id].finish_sinks);
             common_paras.local_bb_cost = wirelength_cost;
             partial_results[kthread_id] = wirelength_cost;
 
@@ -1238,32 +1218,12 @@ static void* try_place_parallel(void* args)
 
         barrier_polling(kthread_id);
         /*data gathering and printing*/
-        tp_data_print_to_screen(kthread_id,
-                                &common_paras.local_timing_cost,
-                                &common_paras.local_delay_cost,
-                                &common_paras.local_crit_exponent,
-                                common_paras.local_max_delay,
-                                input_args,
-                                common_paras.local_placer_opts,
-                                &common_paras.local_total_cost,
-                                &common_paras.local_bb_cost,
-                                &common_paras.local_success_sum,
-                                &common_paras.local_sum_of_squares,
-                                &move_counter,
-                                &common_paras.local_total_iter,
-                                &common_paras.local_success_ratio,
-                                &common_paras.local_av_cost,
-                                &common_paras.local_av_bb_cost,
-                                &common_paras.local_av_timing_cost,
-                                &common_paras.local_av_delay_cost,
-                                &common_paras.local_std_dev,
-                                &common_paras.local_range_limit,
-                                &common_paras.local_final_rlim,
-                                &common_paras.local_inverse_delta_rlim,
-                                &common_paras.local_temper,
-                                &common_paras.local_old_temper,
-                                &inner_iter_num,
-                                common_paras.local_place_delay_value);
+        update_and_print_common_paras(kthread_id,
+                                      &move_counter,
+                                      &inner_iter_num,
+                                      input_args,
+                                      &common_paras);
+
         if (common_paras.local_temper != 0.0) {
             barrier_polling(common_paras.local_thread_id);
         }
@@ -1316,7 +1276,6 @@ static void* try_place_parallel(void* args)
     swap_data.m_bb_edge_new = NULL;
 } /* end of void* try_place_parallel(void* args) */
 
-
 static void  try_place_a_subregion(const int  kthread_id,
                                    const int  krow,
                                    const int  kcol,
@@ -1333,11 +1292,13 @@ static void  try_place_a_subregion(const int  kthread_id,
     const int* kregion_y_boundary = common_paras_ptr->local_region_y_boundary;
     grid_tile_t**  local_grid = swap_data_ptr->m_local_grid;
     local_block_t* local_block = swap_data_ptr->m_local_block;
-    tp_local_data_update(kregion_x_boundary,
-                         kregion_y_boundary,
-                         local_grid,
-                         local_block,
-                         krow, kcol);
+
+    update_local_data_from_global(kregion_x_boundary,
+                                  kregion_y_boundary,
+                                  local_grid,
+                                  local_block,
+                                  krow,
+                                  kcol);
 
     /*sequentially consider each block within the sub-region*/
     const int hori_start_bound = kregion_x_boundary[krow];
@@ -1345,21 +1306,20 @@ static void  try_place_a_subregion(const int  kthread_id,
     const int vert_start_bound = kregion_y_boundary[kcol];
     const int vert_end_bound  =  kregion_y_boundary[kcol + 1];
     const boolean kfixed_pins = common_paras_ptr->local_fixed_pins;
-    const placer_opts_t kplacer_opts = common_paras_ptr->local_placer_opts;
     const double kt = common_paras_ptr->local_temper;
-    int x = 0;
-    int y = 0;
-    int z = 0;
-    for (x = hori_start_bound; x < hori_end_bound; ++x) {
-        for (y = vert_start_bound; y < vert_end_bound; ++y) {
-            if ((local_grid[x][y].type == EMPTY_TYPE)
-                  || (kfixed_pins && local_grid[x][y].type == IO_TYPE)) {
+    int x_from = 0;
+    int y_from = 0;
+    int z_from = 0;
+    for (x_from = hori_start_bound; x_from < hori_end_bound; ++x_from) {
+        for (y_from = vert_start_bound; y_from < vert_end_bound; ++y_from) {
+            if ((local_grid[x_from][y_from].type == EMPTY_TYPE)
+                  || (kfixed_pins && local_grid[x_from][y_from].type == IO_TYPE)) {
                 continue;
             }
-            const int kcapacity = local_grid[x][y].type->capacity;
-            for (z = 0; z < kcapacity; ++z) {
+            const int kcapacity = local_grid[x_from][y_from].type->capacity;
+            for (z_from = 0; z_from < kcapacity; ++z_from) {
                 //do not consider empty locations, ie - four corners of the grid or fixed pins
-                if (local_grid[x][y].blocks[z] == EMPTY) {
+                if (local_grid[x_from][y_from].blocks[z_from] == EMPTY) {
                     continue;
                 }
 
@@ -1367,23 +1327,9 @@ static void  try_place_a_subregion(const int  kthread_id,
                 if (my_irand_parallel(100, kthread_id) >= prob) {
                     ++(*move_counter);
                     int return_val = try_swap_parallel(kt, kthread_id,
-                                                       x, y, z, local_grid[x][y].blocks[z],
-                                                       kplacer_opts.place_cost_type,
-                                                       kplacer_opts.place_algorithm,
-                                                       kplacer_opts.timing_tradeoff,
-                                                       &(common_paras_ptr->local_total_cost),
-                                                       &(common_paras_ptr->local_bb_cost),
-                                                       &(common_paras_ptr->local_timing_cost),
-                                                       &(common_paras_ptr->local_delay_cost),
-                                                       common_paras_ptr->local_inverse_prev_bb_cost,
-                                                       common_paras_ptr->local_inverse_prev_timing_cost,
-                                                       common_paras_ptr->local_range_limit,
-                                                       max(kregion_x_boundary[krow] - 2, 0),
-                                                       min(kregion_x_boundary[krow + 1] + 1,
-                                                           num_grid_columns + 1), /* x direction range */
-                                                       max(kregion_y_boundary[kcol] - 2, 0),
-                                                       min(kregion_y_boundary[kcol + 1] + 1,
-                                                           num_grid_rows + 1), /* y direction range */
+                                                       x_from, y_from, z_from,
+                                                       krow, kcol,
+                                                       common_paras_ptr,
                                                        swap_data_ptr);
                     if (return_val == 1) {
                         ++(common_paras_ptr->local_success_sum);
@@ -1396,9 +1342,9 @@ static void  try_place_a_subregion(const int  kthread_id,
                             ktotal_cost * ktotal_cost;
                     }
                 } /* end of if(my_irand_parallel(100, kthread_id) >= prob) */
-            } /* end of for(z = 0; z < local_grid[x][y].type->capacity; ++z) */
-        } /* end of for(y = vert_start_bound; y < vert_end_bound; ++y) */
-    } /* end of for(x = hori_start_bound; x < hori_end_bound; ++x) */
+            } /* end of for(z_from = 0; z_from < local_grid[x_from][y_from].type->capacity; ++z_from) */
+        } /* end of for(y_from = vert_start_bound; y_from < vert_end_bound; ++y_from) */
+    } /* end of for(x_from = hori_start_bound; x_from < hori_end_bound; ++x_from) */
 
     /*update global data with local changes*/
     update_from_local_to_global(local_block,
@@ -1413,9 +1359,9 @@ static void  try_place_a_subregion(const int  kthread_id,
 
 /* FIXME, Important funtion! It initial all imporant parameters that used for *
  * parallel placement.                                                        */
-static void tp_initialize(pthread_data_t*  input_args,
-                          int*  max_pins_per_fb,
-                          thread_local_common_paras_t*  common_paras_ptr)
+static void initial_common_paras(pthread_data_t*  input_args,
+                                 int*  max_pins_per_fb,
+                                 thread_local_common_paras_t*  common_paras_ptr)
 {
     /*thread-dependent data*/
     common_paras_ptr->local_thread_id = input_args->thread_id;
@@ -1443,7 +1389,7 @@ static void tp_initialize(pthread_data_t*  input_args,
     common_paras_ptr->local_region_x_boundary[1] =
         kx_start + ((int)(kx_end - kx_start) / 2);
     common_paras_ptr->local_region_x_boundary[2] = kx_end;
- 
+
     /* other initializations */
     common_paras_ptr->local_first_rlim = (double)max(num_grid_columns,
                                                      num_grid_rows);
@@ -1487,11 +1433,11 @@ static void tp_initialize(pthread_data_t*  input_args,
 
     start_finish_nets[kthread_id].counter_sink = 0;
     start_finish_nets[kthread_id].counter_edge = 0;
-} /* end of void tp_initialize() */
+} /* end of void initial_common_paras() */
 
-static void tp_alloc_mem(const int max_pins_per_fb,
-                         const placer_opts_t  placer_opts,
-                         thread_local_data_for_swap_t*  swap_data_ptr)
+static void alloc_memory_for_swap_data(const int max_pins_per_fb,
+                                       thread_local_common_paras_t*  common_paras_ptr,
+                                       thread_local_data_for_swap_t* swap_data_ptr)
 {
     /* local_grid[col][row] */
     swap_data_ptr->m_local_grid =
@@ -1521,8 +1467,10 @@ static void tp_alloc_mem(const int max_pins_per_fb,
     /* point_to_point_delay_cost & point_to_point_timing_cost are not updated.
      * Hence, no local copies of these are needed, and global data is read
      * during placement. Global data is updated once per iter */
-    if (placer_opts.place_algorithm == NET_TIMING_DRIVEN_PLACE ||
-            placer_opts.place_algorithm == PATH_TIMING_DRIVEN_PLACE) {
+    const place_algorithm_t kplace_algorithm =
+        common_paras_ptr->local_placer_opts.place_algorithm;
+    if (kplace_algorithm == NET_TIMING_DRIVEN_PLACE
+            || kplace_algorithm == PATH_TIMING_DRIVEN_PLACE) {
         swap_data_ptr->m_local_temp_point_to_point_delay_cost =
             (double**)my_malloc(num_nets * sizeof(double*));
         swap_data_ptr->m_local_temp_point_to_point_timing_cost =
@@ -1539,7 +1487,7 @@ static void tp_alloc_mem(const int max_pins_per_fb,
             --(swap_data_ptr->m_local_temp_point_to_point_timing_cost)[inet];
         }
     }
-} /* end of static void tp_alloc_mem() */
+} /* end of static void alloc_memory_for_swap_data() */
 
 
 static int count_connections()
@@ -1588,21 +1536,17 @@ static void compute_net_pin_index_values()
     }
 }
 
-static double
-get_std_dev(int n,
-            double sum_x_squared,
-            double av_x)
+/* Returns the standard deviation of data set x.  There are n sample points, *
+ * sum_x_squared is the summation over n of x^2 and av_x is the average x.   *
+ * All operations are done in double precision, since round off error can be *
+ * a problem in the initial temp. std_dev calculation for big circuits.      */
+static double get_std_dev(int n,
+                          double sum_x_squared,
+                          double av_x)
 {
-
-    /* Returns the standard deviation of data set x.  There are n sample points, *
-     * sum_x_squared is the summation over n of x^2 and av_x is the average x.   *
-     * All operations are done in double precision, since round off error can be *
-     * a problem in the initial temp. std_dev calculation for big circuits.      */
-
-    double std_dev;
-
+    double std_dev = 0.0;
     if (n <= 1) {
-        std_dev = 0.;
+        std_dev = 0.0;
     } else {
         std_dev = (sum_x_squared - n * av_x * av_x) / (double)(n - 1);
     }
@@ -1617,16 +1561,12 @@ get_std_dev(int n,
 }
 
 
-static void
-update_rlim(double* range_limit,
-            double success_rat)
+/* Update the range limited to keep acceptance prob. near 0.44.  Use *
+ * a floating point range_limit to allow gradual transitions at low temps.  */
+static void update_rlim(double* range_limit,
+                        double success_rat)
 {
-
-    /* Update the range limited to keep acceptance prob. near 0.44.  Use *
-     * a floating point range_limit to allow gradual transitions at low temps.  */
-
     double upper_lim;
-
     *range_limit = (*range_limit) * (1. - 0.60 + success_rat);
     upper_lim = max(num_grid_columns, num_grid_rows);
     *range_limit = min(*range_limit, upper_lim);
@@ -1634,14 +1574,11 @@ update_rlim(double* range_limit,
 }
 
 
-static int
-exit_crit(double t,
-          double cost,
-          annealing_sched_t annealing_sched)
+/* Return 1 when the exit criterion is met.   */
+static int exit_crit(double t,
+                     double cost,
+                     annealing_sched_t annealing_sched)
 {
-
-    /* Return 1 when the exit criterion is met.                        */
-
     if (annealing_sched.type == USER_SCHED) {
         if (t < annealing_sched.exit_t) {
             return (1);
@@ -1651,7 +1588,6 @@ exit_crit(double t,
     }
 
     /* Automatic annealing schedule */
-
     if (t < 0.005 * cost / num_nets) {
         return (1);
     } else {
@@ -2032,7 +1968,6 @@ restore_region_occ(double** old_region_occ_x,
     }
 }
 
-
 /* Puts a list of all the nets connected to from_block and to_block into *
  * nets_to_update. Returns the number of affected nets. Net_block_moved *
  * is either FROM, TO or FROM_AND_TO -- the block connected to this net  *
@@ -2355,15 +2290,15 @@ static double comp_td_point_to_point_delay(int inet,
      * it's too late in the release cycle to do this.  Pushing until the next release */
     if (source_type == IO_TYPE) {
         if (sink_type == IO_TYPE) {
-            delay_source_to_sink = delta_io_to_io[delta_x][delta_y];
+            delay_source_to_sink = delta_inpad_to_outpad[delta_x][delta_y];
         } else {
-            delay_source_to_sink = delta_io_to_fb[delta_x][delta_y];
+            delay_source_to_sink = delta_inpad_to_clb[delta_x][delta_y];
         }
     } else {
         if (sink_type == IO_TYPE) {
-            delay_source_to_sink = delta_fb_to_io[delta_x][delta_y];
+            delay_source_to_sink = delta_clb_to_outpad[delta_x][delta_y];
         } else {
-            delay_source_to_sink = delta_fb_to_fb[delta_x][delta_y];
+            delay_source_to_sink = delta_clb_to_clb[delta_x][delta_y];
         }
     }
 
@@ -2388,7 +2323,7 @@ static void update_td_cost(int from_block,
     /*update the point_to_point_timing_cost values from the temporary */
     /*values for all connections that have changed */
     int blkpin, net_pin, inet, ipin;
-    for (blkpin = 0; blkpin < num_of_pins; blkpin++) {
+    for (blkpin = 0; blkpin < num_of_pins; ++blkpin) {
         inet = block[from_block].nets[blkpin];
         if (inet == OPEN) {
             continue;
@@ -2405,14 +2340,11 @@ static void update_td_cost(int from_block,
 
                 point_to_point_delay_cost[inet][net_pin] =
                     temp_point_to_point_delay_cost[inet][net_pin];
-                temp_point_to_point_delay_cost[inet][net_pin] =
-                    -1;
+                temp_point_to_point_delay_cost[inet][net_pin] = -1;
 
                 point_to_point_timing_cost[inet][net_pin] =
-                    temp_point_to_point_timing_cost[inet]
-                    [net_pin];
-                temp_point_to_point_timing_cost[inet][net_pin] =
-                    -1;
+                    temp_point_to_point_timing_cost[inet][net_pin];
+                temp_point_to_point_timing_cost[inet][net_pin] = -1;
             }
         } else {
             /*this net is being driven by a moved block, recompute */
@@ -2444,25 +2376,18 @@ static void update_td_cost(int from_block,
             }
 
             net_pin = net_pin_index[to_block][blkpin];
-
             if (net_pin != 0) {
-
                 /*the following "if" prevents the value from being updated 2x */
                 if (net[inet].node_block[0] != to_block
                         && net[inet].node_block[0] != from_block) {
 
                     point_to_point_delay_cost[inet][net_pin] =
-                        temp_point_to_point_delay_cost[inet]
-                        [net_pin];
-                    temp_point_to_point_delay_cost[inet]
-                    [net_pin] = -1;
+                        temp_point_to_point_delay_cost[inet][net_pin];
+                    temp_point_to_point_delay_cost[inet][net_pin] = -1;
 
                     point_to_point_timing_cost[inet][net_pin]
-                        =
-                            temp_point_to_point_timing_cost[inet]
-                            [net_pin];
-                    temp_point_to_point_timing_cost[inet]
-                    [net_pin] = -1;
+                        = temp_point_to_point_timing_cost[inet][net_pin];
+                    temp_point_to_point_timing_cost[inet][net_pin] = -1;
                 }
             } else {
                 /*this net is being driven by a moved block, recompute */
@@ -2470,16 +2395,12 @@ static void update_td_cost(int from_block,
                 for (ipin = 1; ipin <= net[inet].num_sinks; ipin++) {
 
                     point_to_point_delay_cost[inet][ipin] =
-                        temp_point_to_point_delay_cost[inet]
-                        [ipin];
-                    temp_point_to_point_delay_cost[inet][ipin]
-                        = -1;
+                        temp_point_to_point_delay_cost[inet][ipin];
+                    temp_point_to_point_delay_cost[inet][ipin] = -1;
 
                     point_to_point_timing_cost[inet][ipin] =
-                        temp_point_to_point_timing_cost[inet]
-                        [ipin];
-                    temp_point_to_point_timing_cost[inet]
-                    [ipin] = -1;
+                        temp_point_to_point_timing_cost[inet][ipin];
+                    temp_point_to_point_timing_cost[inet][ipin] = -1;
                 }
             }
         }
@@ -2980,7 +2901,7 @@ static void alloc_and_load_placement_structs(int place_cost_type,
         for (inet = 0; inet < num_nets; ++inet) {
             /* in the following, subract one so index starts at *
              * 1 instead of 0 */
-            point_to_point_delay_cost[inet] = 
+            point_to_point_delay_cost[inet] =
                     (double*)my_malloc(net[inet].num_sinks * sizeof(double));
             --(point_to_point_delay_cost[inet]);
 
@@ -3784,7 +3705,7 @@ static void free_fast_cost_update_structs(void)
     }
 
     free(chany_place_cost_fac);
-} 
+}
 
 /* Allocates and loads the chanx_place_cost_fac and chany_place_cost_fac *
  * arrays with the inverse of the average number of tracks per channel   *
@@ -3798,7 +3719,7 @@ static void free_fast_cost_update_structs(void)
  * specifies to what power the width of the channel should be taken --   *
  * larger numbers make narrower channels more expensive.                 */
 static void alloc_and_load_for_fast_cost_update(double place_cost_exp)
-{    
+{
     /* Access arrays below as chan?_place_cost_fac[subhigh][sublow].  Since   *
      * subhigh must be greater than or equal to sublow, we only need to       *
      * allocate storage for the lower half of a matrix.                       */
@@ -4000,7 +3921,7 @@ static double check_place(double bb_cost,
 
 /*  Parallel Placement functions Startings....     */
 /*partition nets evenly based on number of edges each net is connected to(that is sub-connections). */
-static void balance_two_consecutive_threads_edge(int kthread_id)
+static void balance_two_consecutive_threads_edge(const int kthread_id)
 {
     ++(start_finish_nets[kthread_id].counter_edge);
     unsigned long work_in_this_region = start_finish_nets[kthread_id].edges_in_this_partition;
@@ -4044,7 +3965,7 @@ static void balance_two_consecutive_threads_edge(int kthread_id)
 } /* end of void balance_two_consecutive_threads_edge(int kthread_id)  */
 
 /*partition nets evenly based on number of sinks each net is connected to*/
-static void balance_two_consecutive_threads_sinks(int kthread_id)
+static void balance_two_consecutive_threads_sinks(const int kthread_id)
 {
     ++(start_finish_nets[kthread_id].counter_sink);
     unsigned long work_in_this_region = start_finish_nets[kthread_id].sinks_in_this_partition;
@@ -4082,8 +4003,8 @@ static void balance_two_consecutive_threads_sinks(int kthread_id)
 
 /* Copy memory from bb_num_on_edges(or bb_coords) to *
  * local_bb_edge(local_bb_coord) */
-static void tp_init_local(const int*  region_x_boundary,
-                          thread_local_data_for_swap_t*  swap_data_ptr)
+static void initial_swap_data(thread_local_common_paras_t*  common_paras_ptr,
+                              thread_local_data_for_swap_t* swap_data_ptr)
 {
     memcpy(swap_data_ptr->m_local_bb_edge,
            bb_num_on_edges,
@@ -4100,8 +4021,9 @@ static void tp_init_local(const int*  region_x_boundary,
 
     /* extend sub-region[start_boundary-2..end_boundary_x+2] */
     grid_tile_t** local_grid = swap_data_ptr->m_local_grid;
-    for (x = region_x_boundary[0] - 2;
-            x < region_x_boundary[2] + 2 && x < (num_grid_columns + 2); ++x) {
+    const int* kregion_x_boundary = common_paras_ptr->local_region_x_boundary;
+    for (x = kregion_x_boundary[0] - 2;
+            x < kregion_x_boundary[2] + 2 && x < (num_grid_columns + 2); ++x) {
         /*  takes care of proc #1, where start_end_boundary = 0 */
         if (x < 0) {
             x = 0;
@@ -4127,8 +4049,29 @@ static void tp_init_local(const int*  region_x_boundary,
         local_block[x].y = block[x].y;
         local_block[x].z = block[x].z;
     }
-}  /* end of void tp_init_local(bbox_t* local_bb_edge,...) */
+}  /* end of void initial_swap_data(bbox_t* local_bb_edge,...) */
 
+/*finds the fanin to a particular node*/
+static void find_fanin_parallel(const int kthread_id)
+{
+    int tnodes_assign_to_thread = ceil((double)num_tnodes / NUM_OF_THREADS);
+    int start_tnode = kthread_id * tnodes_assign_to_thread;
+    int finish_tnode = min((kthread_id + 1) * tnodes_assign_to_thread,
+                           num_tnodes);
+    int i = 0;
+    for (i = start_tnode; i < finish_tnode; ++i) {
+        int num_edges = tnode[i].num_edges;
+        t_tedge* tedge = tnode[i].out_edges;
+
+        int iedge = 0;
+        for (iedge = 0; iedge < num_edges; ++iedge) {
+            int to_node = tedge[iedge].to_node;
+            /* FIXME, don't use ++tnode[to_node].num_parents */
+            int counter = tnode[to_node].num_parents++;
+            tnode[to_node].in_edges[counter].to_node = i;
+        }
+    }
+} /* end of void find_fanin_parallel(int kthread_id) */
 
 static void tp_init_localvert_grid()
 {
@@ -4155,11 +4098,11 @@ static void tp_init_localvert_grid()
 } /* end of void tp_init_localvert_grid() */
 
 
-/* FIXME, important for update timing parallel */ 
-static void tp_timing_update_full(int kthread_id,
-                                  double*** net_delay,
-                                  pthread_data_t* input_args,
-                                  double*   max_delay)
+/* FIXME, important for update timing parallel */
+static void perform_timing_analyze_parallel(const int  kthread_id,
+                                            double*** net_delay,
+                                            pthread_data_t* input_args,
+                                            double*   max_delay)
 {
     /*dynamic workload setup*/
     const int counter_sink = start_finish_nets[kthread_id].counter_sink;
@@ -4272,17 +4215,17 @@ static void tp_timing_update_full(int kthread_id,
         }
         barrier_polling(kthread_id);
     }  /* end of for(ilevel = num_tnode_levels - 1; ilevel >= 0; --ilevel)*/
-}  /* end of void tp_timing_update_full(int kthread_id,...)  */
+}  /* end of void perform_timing_analyze_parallel(int kthread_id,...)  */
 
 /* FIXME, If I want to compute net_slack, first I must calcuatel all edge's delay value,
  * then calcuate all vertexes' arr_time and req_time. Last compute slack       */
-static void tp_compute_net_slack(int kthread_id,
-                                 double***  net_slack,
-                                 double*  timing_cost,
-                                 double*  delay_cost,
-                                 double  crit_exponent,
-                                 double  max_delay,
-                                 pthread_data_t* input_args)
+static void compute_net_slack_full(const int kthread_id,
+                                   double***  net_slack,
+                                   double*  timing_cost,
+                                   double*  delay_cost,
+                                   double  crit_exponent,
+                                   double  max_delay,
+                                   pthread_data_t* input_args)
 {
     /* part 5
      * compute net slacks */
@@ -4306,7 +4249,7 @@ static void tp_compute_net_slack(int kthread_id,
     if (kthread_id != NUM_OF_THREADS - 1
           && thread_counter_edge < (num_nets / PARITION_UPDATE)) {
         /* update and balance the thread and (thread + 1)'s start_edge and
-         * finish_edge */ 
+         * finish_edge */
         balance_two_consecutive_threads_edge(kthread_id);
     }
 
@@ -4355,12 +4298,12 @@ static void tp_compute_net_slack(int kthread_id,
           && thread_counter_sink < num_nets / PARITION_UPDATE) {
         balance_two_consecutive_threads_sinks(kthread_id);
     }
-}  /* end of void tp_compute_net_slack(int kthread_id,..) */
+}  /* end of void compute_net_slack_full(int kthread_id,..) */
 
-static void tp_timing_calc(int kthread_id,
-                           double* timing_cost,
-                           double* delay_cost,
-                           pthread_data_t* input_args)
+static void calculate_timing_without_update_crit(const int kthread_id,
+                                                 double* timing_cost,
+                                                 double* delay_cost,
+                                                 pthread_data_t* input_args)
 {
     const int thread_counter_sink = start_finish_nets[kthread_id].counter_sink;
     const int thread_finish_sinks = start_finish_nets[kthread_id].finish_sinks;
@@ -4384,13 +4327,13 @@ static void tp_timing_calc(int kthread_id,
     if (kthread_id != NUM_OF_THREADS - 1 && thread_counter_sink < num_nets / PARITION_UPDATE) {
         balance_two_consecutive_threads_sinks(kthread_id);
     }
-}  /* end of static void tp_timing_calc(int kthread_id,..) */
+}  /* end of static void calculate_timing_without_update_crit(int kthread_id,..) */
 
 
-static void tp_iter_data_update(const int kiter,
-                                pthread_data_t* input_args,
-                                thread_local_common_paras_t*  common_paras_ptr,
-                                thread_local_data_for_swap_t* swap_data_ptr)
+static void iter_data_update_from_global_to_local_grid(const int kiter,
+                                                       pthread_data_t* input_args,
+                                                       thread_local_common_paras_t*  common_paras_ptr,
+                                                       thread_local_data_for_swap_t* swap_data_ptr)
 {
     /* Regions in first row of the region grid */
     const int  kthread_id = common_paras_ptr->local_thread_id;
@@ -4466,17 +4409,17 @@ static void tp_iter_data_update(const int kiter,
     memcpy(swap_data_ptr->m_local_net_cost,
            net_cost,
            num_nets * sizeof(double));
-} /* end of void tp_iter_data_update(int kthread_id... ) */
+} /* end of void iter_data_update_from_global_to_local_grid(int kthread_id... ) */
 
 /* Update local sub-region(in a Region) horizontal and vertical seperately */
-static void tp_local_data_update(const int* region_x_boundary,
-                                 const int* region_y_boundary,
-                                 grid_tile_t**  local_grid,
-                                 local_block_t* local_block,
-                                 const int krow,
-                                 const int kcol)
+static void update_local_data_from_global(const int* region_x_boundary,
+                                          const int* region_y_boundary,
+                                          grid_tile_t**  local_grid,
+                                          local_block_t* local_block,
+                                          const int krow,
+                                          const int kcol)
 {
-    /* update local grid information, first was horizontal direction, 
+    /* update local grid information, first was horizontal direction,
      * then was vertical direction. */
     if (krow == 0 && kcol == 0) {
         /* update top of the strip(horizontal direction) */
@@ -4522,7 +4465,7 @@ static void tp_local_data_update(const int* region_x_boundary,
         /* update left side strip(vertical directions) */
         update_from_global_to_local_vert(local_block,
                                          local_grid,
-                                         region_x_boundary[1] - 2, 
+                                         region_x_boundary[1] - 2,
                                          min(num_grid_columns + 2,
                                              region_x_boundary[2] + 2),
                                          max(0, region_y_boundary[0] - 2),
@@ -4549,36 +4492,19 @@ static void tp_local_data_update(const int* region_x_boundary,
     } else {
         printf("incorrect row,col combination in inner loop: (%d, %d)", krow, kcol);
     }
-}  /* end of void tp_local_data_update(int* region_x_boundary) */
+} /* end of void update_local_data_from_global(int* region_x_boundary) */
 
 
 /* Update the temperature according to the annealing schedule selected. */
 static void update_t_parallel(double* t,
-                              int* inner_iter_num,
+                              int*  inner_iter_num,
                               double range_limit,
                               double success_rat,
                               annealing_sched_t annealing_sched)
 {
-    /*  double fac; */
     if (annealing_sched.type == USER_SCHED) {
         *t = annealing_sched.alpha_t * (*t);
-    }
-    /* Old standard deviation based stuff is below.  This bogs down horribly
-     * for big circuits (alu4 and especially bigkey_mod). */
-    /* #define LAMBDA .7  */
-    /* ------------------------------------ */
-#if 0
-    else if (std_dev == 0.) {
-        *t = 0.;
     } else {
-        fac = exp(-LAMBDA * (*t) / std_dev);
-        fac = max(0.5, fac);
-        *t = (*t) * fac;
-    }
-
-#endif
-    /* ------------------------------------- */
-    else {
         /* AUTO_SCHED */
         *inner_iter_num = annealing_sched.inner_num;
         if (success_rat > 0.96) {
@@ -4593,7 +4519,7 @@ static void update_t_parallel(double* t,
             *inner_iter_num = annealing_sched.inner_num / 20;
         }
     }
-}
+} /* end of static void update_t_parallel(double* t,..) */
 
 /* Puts a list of all the nets connected to from_block and to_block into  *
  * nets_to_update.  Returns the number of affected nets.  Net_block_moved *
@@ -4822,15 +4748,15 @@ static double comp_td_point_to_point_delay_parallel(int inet,
     double delay_source_to_sink = 0.0;
     if (source_type == IO_TYPE) {
         if (sink_type == IO_TYPE) {
-            delay_source_to_sink = delta_io_to_io[delta_x][delta_y];
+            delay_source_to_sink = delta_inpad_to_outpad[delta_x][delta_y];
         } else {
-            delay_source_to_sink = delta_io_to_fb[delta_x][delta_y];
+            delay_source_to_sink = delta_inpad_to_clb[delta_x][delta_y];
         }
     } else {
         if (sink_type == IO_TYPE) {
-            delay_source_to_sink = delta_fb_to_io[delta_x][delta_y];
+            delay_source_to_sink = delta_clb_to_outpad[delta_x][delta_y];
         } else {
-            delay_source_to_sink = delta_fb_to_fb[delta_x][delta_y];
+            delay_source_to_sink = delta_clb_to_clb[delta_x][delta_y];
         }
     }
 
@@ -4854,14 +4780,14 @@ static double comp_td_point_to_point_delay_parallel(int inet,
 /*sink timing costs recomputed. A net that is driving a moved block */
 /*must only have the timing cost on the connection driving the input_args */
 /*pin computed */
-static void comp_delta_td_cost_parallel(int from_block,
-                                        int to_block,
-                                        int num_of_pins,
-                                        double* delta_timing,
-                                        double* delta_delay,
-                                        local_block_t* local_block,
-                                        double** local_temp_point_to_point_timing_cost,
-                                        double** local_temp_point_to_point_delay_cost)
+static void compute_delta_td_cost_parallel(const int kfrom_block,
+                                           const int kto_block,
+                                           int num_of_pins,
+                                           double* delta_timing,
+                                           double* delta_delay,
+                                           local_block_t* local_block,
+                                           double** local_temp_point_to_point_timing_cost,
+                                           double** local_temp_point_to_point_delay_cost)
 {
     double delta_timing_cost = 0.0;
     double delta_delay_cost = 0.0;
@@ -4870,12 +4796,12 @@ static void comp_delta_td_cost_parallel(int from_block,
     int pin_index = -1;
     int ipin = 0;
     for (pin_index = 0; pin_index < num_of_pins; ++pin_index) {
-        const int inet = block[from_block].nets[pin_index];
+        const int inet = block[kfrom_block].nets[pin_index];
         if (OPEN == inet || TRUE == net[inet].is_global) {
             continue;
         }
 
-        const int net_pin = net_pin_index[from_block][pin_index];
+        const int net_pin = net_pin_index[kfrom_block][pin_index];
         if (net_pin != 0) {
         /* This net_pin is not a driver_pin, so this net drived a moved block. *
          * if this net is being driven by a block that has moved, we do not  *
@@ -4883,10 +4809,10 @@ static void comp_delta_td_cost_parallel(int from_block,
          * be computed in the fanout of the net on the driving block, also  *
          * computing it here would double count the change, and mess up the  *
          * delta_timing_cost value */
-            if (net[inet].node_block[0] != to_block
-                    && net[inet].node_block[0] != from_block) {
+            if (net[inet].node_block[0] != kto_block
+                    && net[inet].node_block[0] != kfrom_block) {
             /* In this situation, the drivering node of this net neither *
-             * from_block nor to_block */
+             * kfrom_block nor kto_block */
                 temp_delay = comp_td_point_to_point_delay_parallel(inet,
                                                                    net_pin,
                                                                    local_block);
@@ -4923,24 +4849,24 @@ static void comp_delta_td_cost_parallel(int from_block,
         }
     }  /* end of for (pin_index = 0; pin_index < num_of_pins; ++pin_index) */
 
-    /* end of from_block, then consider the to_block. It was similar with former program. */
-    if (to_block != EMPTY) {
+    /* end of kfrom_block, then consider the kto_block. It was similar with former program. */
+    if (kto_block != EMPTY) {
         for (pin_index = 0; pin_index < num_of_pins; ++pin_index) {
-            const int inet = block[to_block].nets[pin_index];
+            const int inet = block[kto_block].nets[pin_index];
             if (OPEN == inet || TRUE == net[inet].is_global) {
                 continue;
             }
-            /* just considering the nets connected to to_block */
-            const int net_pin = net_pin_index[to_block][pin_index];
+            /* just considering the nets connected to kto_block */
+            const int net_pin = net_pin_index[kto_block][pin_index];
             if (net_pin != 0) {
-            /* This net is driving moved to_block! *
+            /* This net is driving moved kto_block! *
              * If this net is being driven by a block that has moved, we do not *
              * need to compute the change in the timing cost (here) since it was *
              * computed in the fanout of the net on the driving block, also    *
              * computing it here would double count the change, and mess up the *
              * delta_timing_cost value */
-                if (net[inet].node_block[0] != to_block
-                        && net[inet].node_block[0] != from_block) {
+                if (net[inet].node_block[0] != kto_block
+                        && net[inet].node_block[0] != kfrom_block) {
                     temp_delay = comp_td_point_to_point_delay_parallel(inet,
                                                                        net_pin,
                                                                        local_block);
@@ -4956,7 +4882,7 @@ static void comp_delta_td_cost_parallel(int from_block,
                         (local_temp_point_to_point_timing_cost[inet][net_pin]
                            - point_to_point_timing_cost[inet][net_pin]);
                 }
-            } else {  /* net_pin was driver_pin, so to_block was a driver block */
+            } else {  /* net_pin was driver_pin, so kto_block was a driver block */
                 /*this net is being driven by a moved block, recompute */
                 /*all point to point connections on this net. */
                 for (ipin = 1; ipin <= net[inet].num_sinks; ++ipin) {
@@ -4977,19 +4903,19 @@ static void comp_delta_td_cost_parallel(int from_block,
                 }
             }  /* end of else(net_pin was a driver_pin) */
         }  /* end of for (pin_index = 0; pin_index < num_of_pins; ++pin_index) */
-    }  /* end of if (to_block != EMPTY) */
+    }  /* end of if (kto_block != EMPTY) */
 
     *delta_timing = delta_timing_cost;
     *delta_delay = delta_delay_cost;
-}  /* end of void comp_delta_td_cost_parallel(...) */
+}  /* end of void compute_delta_td_cost_parallel(...) */
 
 /*computes the cost (from scratch) due to the delays and criticalities*
  *on all point to point connections, we define the timing cost of     *
  *each connection as criticality * Tdel */
 static unsigned long compute_td_costs_parallel_without_update_crit(double* timing_cost,
-                                             double* connection_delay_sum,
-                                             int start_net,
-                                             int finish_net)
+                                                                   double* connection_delay_sum,
+                                                                   int start_net,
+                                                                   int finish_net)
 {
     double loc_timing_cost = 0.0;
     double loc_connection_delay_sum = 0.0;
@@ -5085,12 +5011,12 @@ static unsigned long compute_td_costs_parallel_with_update_crit(double* timing_c
  * are found via the non_updateable_bb routine, to provide a    *
  * cost which can be used to check the correctness of the       *
  * other routine.                                               */
-static double comp_bb_cost_parallel(int start_net,
-                                    int end_net)
+static double compute_bb_cost_parallel(const int kstart_net,
+                                       const int kend_net)
 {
     double cost = 0;
     int k = 0;
-    for (k = start_net; k < end_net; ++k) {
+    for (k = kstart_net; k < kend_net; ++k) {
         /* for each net ... */
         if (net[k].is_global == FALSE) {
             /* Do only if not global. */
@@ -5103,7 +5029,7 @@ static double comp_bb_cost_parallel(int start_net,
         }
     }
     return cost;
-}  /* end of static double comp_bb_cost_parallel(int start_net,) */
+}  /* end of static double compute_bb_cost_parallel(int start_net,) */
 
 /* This routine finds the bounding box of each net from scratch (i.e.    *
  * from only the block location information).  It updates both the       *
@@ -5443,52 +5369,61 @@ static void update_bb_parallel(int inet,
 
 /* I insisted that the most important parameter was the kthread_id */
 /* try swap a pair of blocks in each Extend-SubRegion by each thread parallely */
-static int  try_swap_parallel(const double t,
-                              const int  kthread_id,
-                              const int  x_from,
-                              const int  y_from,
-                              const int  z_from,
-                              const int  from_block,
-                              const int  place_cost_type,
-                              const place_algorithm_t place_algorithm,
-                              const double timing_tradeoff,
-                              double*  cost,
-                              double*  bb_cost,
-                              double*  timing_cost,
-                              double*  delay_cost,
-                              double  inverse_prev_bb_cost,
-                              double  inverse_prev_timing_cost,
-                              double  range_limit,
-                              int xMin, int xMax,
-                              int yMin, int yMax,
+static int  try_swap_parallel(const double kt,
+                              const int kthread_id,
+                              const int kx_from,
+                              const int ky_from,
+                              const int kz_from,
+                              const int krow,
+                              const int kcol,
+                              thread_local_common_paras_t*  common_paras_ptr,
                               thread_local_data_for_swap_t* swap_data_ptr)
 {
     /* the flow of try_swap_parallel was that: (1) find to_block, it will swap *
      * with to_block */
     /*constrain the swap region*/
-    int limit = (int)range_limit;
-    limit = min(10, range_limit);
-    xMin = max(xMin, x_from - limit);
-    xMax = min(xMax, x_from + limit);
-    yMin = max(yMin, y_from - limit);
-    yMax = min(yMax, y_from + limit);
+    const double krange_limit = common_paras_ptr->local_range_limit;
+    int limit = min(10, (int)krange_limit);
+
+    const int* kregion_x_boundary = common_paras_ptr->local_region_x_boundary;
+    const int* kregion_y_boundary = common_paras_ptr->local_region_y_boundary;
+    int x_min = max(kregion_x_boundary[krow] - 2, 0);
+    int x_max = min(kregion_x_boundary[krow + 1] + 1,
+                    num_grid_columns + 1);
+    int y_min = max(kregion_y_boundary[kcol] - 2, 0);
+    int y_max = min(kregion_y_boundary[kcol + 1] + 1,
+                    num_grid_rows + 1);
+
+    x_min = max(x_min, kx_from - limit);
+    x_max = min(x_max, kx_from + limit);
+    y_min = max(y_min, ky_from - limit);
+    y_max = min(y_max, ky_from + limit);
 
     /* First, find a block within the current swap region*/
     double delay_delta_c = 0.0;
     int x_to = 0;
     int y_to = 0;
-    find_to_block_parallel(x_from, y_from, block[from_block].type,
-                           &x_to, &y_to, kthread_id,
-                           xMin, xMax, yMin, yMax);
-    /* Ensure that from_block and to_block are same type */
     grid_tile_t** local_grid = swap_data_ptr->m_local_grid;
-    assert(local_grid[x_from][y_from].type == local_grid[x_to][y_to].type);
+    const int kfrom_block = local_grid[kx_from][ky_from].blocks[kz_from];
+    find_to_block_parallel(kx_from,
+                           ky_from,
+                           block[kfrom_block].type,
+                           &x_to,
+                           &y_to,
+                           kthread_id,
+                           x_min,
+                           x_max,
+                           y_min,
+                           y_max);
+    /* Ensure that from_block and to_block are same type */
+    assert(local_grid[kx_from][ky_from].type == local_grid[x_to][y_to].type);
 
     /* then find a location for to_grid tile */
     int z_to = 0;
     if (local_grid[x_to][y_to].type->capacity > 1) {
         int to_grid_capacity = local_grid[x_to][y_to].type->capacity - 1;
-        z_to = my_irand_parallel(to_grid_capacity, kthread_id);
+        z_to = my_irand_parallel(to_grid_capacity,
+                                 kthread_id);
     }
 
     /* Second, swap the from_block and to_block location */
@@ -5498,25 +5433,25 @@ static int  try_swap_parallel(const double t,
     if (local_grid[x_to][y_to].blocks[z_to] == EMPTY) {
         /* Moving from_block to an empty location */
         to_block = EMPTY;
-        local_block[from_block].x = x_to;
-        local_block[from_block].y = y_to;
-        local_block[from_block].z = z_to;
+        local_block[kfrom_block].x = x_to;
+        local_block[kfrom_block].y = y_to;
+        local_block[kfrom_block].z = z_to;
     } else {
         /* Swapping two non-empty location */
         to_block = local_grid[x_to][y_to].blocks[z_to];
-        local_block[to_block].x = x_from;
-        local_block[to_block].y = y_from;
-        local_block[to_block].z = z_from;
+        local_block[to_block].x = kx_from;
+        local_block[to_block].y = ky_from;
+        local_block[to_block].z = kz_from;
 
-        local_block[from_block].x = x_to;
-        local_block[from_block].y = y_to;
-        local_block[from_block].z = z_to;
+        local_block[kfrom_block].x = x_to;
+        local_block[kfrom_block].y = y_to;
+        local_block[kfrom_block].z = z_to;
     }
 
     /*------------------------  Third, compute the swap cost ----------------*/
     /* Change in cost due to this swap. */
     double bb_delta_c = 0;
-    int num_of_pins = block[from_block].type->num_pins;
+    int num_of_pins = block[kfrom_block].type->num_pins;
     /* (3.1). I must found out the affected nets, it restored in *
      * int* nets_to_update array. */
     int* nets_to_update = swap_data_ptr->m_nets_to_update;
@@ -5524,7 +5459,7 @@ static int  try_swap_parallel(const double t,
     double* local_temp_net_cost = swap_data_ptr->m_local_temp_net_cost;
     const int knum_nets_affected = find_affected_nets_parallel(nets_to_update,
                                                                net_block_moved,
-                                                               from_block,
+                                                               kfrom_block,
                                                                to_block,
                                                                num_of_pins,
                                                                local_temp_net_cost);
@@ -5538,6 +5473,8 @@ static int  try_swap_parallel(const double t,
     bbox_t*  local_bb_edge = swap_data_ptr->m_local_bb_edge;
 
     double*  local_net_cost = swap_data_ptr->m_local_net_cost;
+    const place_cong_types_t kplace_cost_type =
+        common_paras_ptr->local_placer_opts.place_cost_type;
     for (k = 0; k < knum_nets_affected; ++k) {
         int inet = nets_to_update[k];
         if (net_block_moved[k] == FROM_AND_TO) {
@@ -5555,7 +5492,7 @@ static int  try_swap_parallel(const double t,
                                    local_bb_edge,
                                    &bb_coord_new[bb_index],
                                    &bb_edge_new[bb_index],
-                                   x_from, y_from,
+                                   kx_from, ky_from,
                                    x_to, y_to,
                                    local_block);
             } else {
@@ -5565,12 +5502,12 @@ static int  try_swap_parallel(const double t,
                                    &bb_coord_new[bb_index],
                                    &bb_edge_new[bb_index],
                                    x_to, y_to,
-                                   x_from, y_from,
+                                   kx_from, ky_from,
                                    local_block);
             }
         }  /* end of else(num_sinks >= SMALL_NET) */
 
-        if (place_cost_type != NONLINEAR_CONG) {
+        if (kplace_cost_type != NONLINEAR_CONG) {
             local_temp_net_cost[inet] = get_net_cost(inet,
                                                      &bb_coord_new[bb_index]);
             bb_delta_c += (local_temp_net_cost[inet] - local_net_cost[inet]);
@@ -5580,31 +5517,40 @@ static int  try_swap_parallel(const double t,
         }
 
         ++bb_index;
-    } /* end of for (.k = 0; .k < .num_nets_affected; ++.k) */
+    } /* end of for(k = 0; k < num_nets_affected; ++k) */
 
     /* (3.3) Calcualte the timing_cost parallel */
     double timing_delta_c = 0.0;
     double delta_c = 0.0;
+    const place_algorithm_t kplace_algorithm =
+        common_paras_ptr->local_placer_opts.place_algorithm;
+    const double ktiming_tradeoff =
+        common_paras_ptr->local_placer_opts.timing_tradeoff;
+    const double kinverse_prev_bb_cost =
+        common_paras_ptr->local_inverse_prev_bb_cost;
+    const double kinverse_prev_timing_cost =
+        common_paras_ptr->local_inverse_prev_timing_cost;
     double**  local_temp_point_to_point_timing_cost =
         swap_data_ptr->m_local_temp_point_to_point_timing_cost;
     double**  local_temp_point_to_point_delay_cost =
         swap_data_ptr->m_local_temp_point_to_point_delay_cost;
-    if (place_algorithm == NET_TIMING_DRIVEN_PLACE ||
-            place_algorithm == PATH_TIMING_DRIVEN_PLACE) {
-        /* When compute timing_driven_cost(no matteer parallel or sequential), 
+    if (kplace_algorithm == NET_TIMING_DRIVEN_PLACE ||
+            kplace_algorithm == PATH_TIMING_DRIVEN_PLACE) {
+        /* When compute timing_driven_cost(no matteer parallel or sequential),
          * It should distinguish the driver_pin and not driver_pins */
-        comp_delta_td_cost_parallel(from_block,
-                                    to_block,
-                                    num_of_pins,
-                                    &timing_delta_c,
-                                    &delay_delta_c,
-                                    local_block,
-                                    local_temp_point_to_point_timing_cost,
-                                    local_temp_point_to_point_delay_cost);
+        compute_delta_td_cost_parallel(kfrom_block,
+                                       to_block,
+                                       num_of_pins,
+                                       &timing_delta_c,
+                                       &delay_delta_c,
+                                       local_block,
+                                       local_temp_point_to_point_timing_cost,
+                                       local_temp_point_to_point_delay_cost);
 
-        const double bbox_cost = bb_delta_c * inverse_prev_bb_cost;
-        const double timing_cost = timing_delta_c * inverse_prev_timing_cost;
-        delta_c = (1 - timing_tradeoff) * bbox_cost + timing_tradeoff * timing_cost;
+        const double knormal_bb_cost = bb_delta_c * kinverse_prev_bb_cost;
+        const double knormal_timing_cost = timing_delta_c * kinverse_prev_timing_cost;
+        delta_c = (1 - ktiming_tradeoff) * knormal_bb_cost +
+                       ktiming_tradeoff * knormal_timing_cost;
     } else {
         delta_c = bb_delta_c;
     }
@@ -5612,16 +5558,16 @@ static int  try_swap_parallel(const double t,
     /* Forth, After calcuate placement cost, then assess swap *
      * 1->move accepted, 0->rejected.                  */
     int keep_switch = assess_swap_parallel(delta_c,
-                                           t,
+                                           kt,
                                            kthread_id);
     if (keep_switch) {
         /* Swap successful! first update cost value. */
-        *cost += delta_c;
-        *bb_cost +=  bb_delta_c;
-        if (place_algorithm == NET_TIMING_DRIVEN_PLACE ||
-                place_algorithm == PATH_TIMING_DRIVEN_PLACE) {
-            *timing_cost += timing_delta_c;
-            *delay_cost += delay_delta_c;
+        common_paras_ptr->local_total_cost += delta_c;
+        common_paras_ptr->local_bb_cost +=  bb_delta_c;
+        if (kplace_algorithm == NET_TIMING_DRIVEN_PLACE
+                || kplace_algorithm == PATH_TIMING_DRIVEN_PLACE) {
+            common_paras_ptr->local_timing_cost += timing_delta_c;
+            common_paras_ptr->local_delay_cost += delay_delta_c;
         }
 
         /* then update affected nets */
@@ -5643,12 +5589,12 @@ static int  try_swap_parallel(const double t,
             local_temp_net_cost[inet] = -1;
         }
 
-        local_grid[x_to][y_to].blocks[z_to] = from_block;
-        local_grid[x_from][y_from].blocks[z_from] = to_block;
+        local_grid[x_to][y_to].blocks[z_to] = kfrom_block;
+        local_grid[kx_from][ky_from].blocks[kz_from] = to_block;
 
         if (EMPTY == to_block) {
             ++(local_grid[x_to][y_to].usage);
-            --(local_grid[x_from][y_from].usage);
+            --(local_grid[kx_from][ky_from].usage);
         }
     } else {
         for (k = 0; k < knum_nets_affected; ++k) {
@@ -5656,9 +5602,9 @@ static int  try_swap_parallel(const double t,
             local_temp_net_cost[inet] = -1;
         }
 
-        local_block[from_block].x = x_from;
-        local_block[from_block].y = y_from;
-        local_block[from_block].z = z_from;
+        local_block[kfrom_block].x = kx_from;
+        local_block[kfrom_block].y = ky_from;
+        local_block[kfrom_block].z = kz_from;
 
         if (to_block != EMPTY) {
             local_block[to_block].x = x_to;
@@ -5705,11 +5651,11 @@ static void update_from_local_to_global(local_block_t* local_block,
                         block[block_moved].x = local_block[block_moved].x;
                         block[block_moved].y = local_block[block_moved].y;
                         block[block_moved].z = local_block[block_moved].z;
-                    }
-                }
-            }
-        }
-    }
+                    } /* end of if(local_grid[x][y].blocks[z] != grid[x][y].blocks[z]) */
+                } /* end of for(z = 0; z < grid[x][y].type->capacity; ++z) */
+            } /* end of if(local_grid[x][y].type != EMPTY_TYPE) */
+        } /* end of for(y = y_start; y < y_end; ++y) */
+    } /* end of for(x = x_start; x < x_end; ++x) */
 }  /* end of void update_from_local_to_global(local_block_t* local_block,) */
 
 static void update_from_global_to_local_hori(local_block_t* local_block,
@@ -5832,123 +5778,146 @@ static void print_grid(void)
     fclose(print_grid_ptr);
 } /* end of print_grid() */
 
-static void tp_data_print_to_screen(int kthread_id,
-                             double* timing_cost,
-                             double* delay_cost,
-                             double* crit_exponent,
-                             double max_delay,
-                             pthread_data_t* input_args,
-                             placer_opts_t placer_opts,
-                             double* cost,
-                             double* bb_cost,
-                             int* success_sum, double* sum_of_squares,
-                             int* move_counter, int* tot_iter, double* success_rat,
-                             double* av_cost, double* av_bb_cost, double* av_timing_cost, double* av_delay_cost,
-                             double* std_dev,
-                             double* range_limit, double* final_rlim, double* inverse_delta_rlim,
-                             double* t, double* oldt, int* inner_iter_num,
-                             double place_delay_value)
+
+static void update_and_print_common_paras(const int kthread_id,
+                                          int*  move_counter_ptr,
+                                          int*  inner_iter_num_ptr,
+                                          pthread_data_t*  input_args,
+                                          thread_local_common_paras_t* common_paras_ptr)
 {
     if (kthread_id == 0) {
-        *success_sum = *(input_args->success_sum);
-        *sum_of_squares = *(input_args->sum_of_squares);
-        *move_counter = *(input_args->move_lim);
+        common_paras_ptr->local_success_sum = *(input_args->success_sum);
+        common_paras_ptr->local_sum_of_squares = *(input_args->sum_of_squares);
+        *move_counter_ptr = *(input_args->move_lim);
 
-        *tot_iter = *(input_args->tot_iter);
-        *tot_iter += *move_counter;
+        common_paras_ptr->local_total_iter = *(input_args->tot_iter);
+        common_paras_ptr->local_total_iter += *move_counter_ptr;
 
-        *success_rat = ((double) * success_sum) / *move_counter;
+        const int ksuccess_sum = common_paras_ptr->local_success_sum;
+        common_paras_ptr->local_success_ratio =
+            ((double)ksuccess_sum) / *move_counter_ptr;
 
-        *av_cost = *(input_args->av_cost);
-        *av_bb_cost = *(input_args->av_bb_cost);
-        *av_timing_cost = *(input_args->av_timing_cost);
-        *av_delay_cost = *(input_args->av_delay_cost);
+        common_paras_ptr->local_av_cost = *(input_args->av_cost);
+        common_paras_ptr->local_av_bb_cost = *(input_args->av_bb_cost);
+        common_paras_ptr->local_av_timing_cost = *(input_args->av_timing_cost);
+        common_paras_ptr->local_av_delay_cost = *(input_args->av_delay_cost);
 
-        *av_timing_cost = *av_timing_cost + 0.;
-        *success_rat = *success_rat + 0.;
-
-        if (success_sum == 0) {
-            *av_cost = *cost;
-            *av_bb_cost = *bb_cost;
-            *av_timing_cost = *timing_cost;
-            *av_delay_cost = *delay_cost;
+        /* common_paras_ptr->local_av_timing_cost = *av_timing_cost + 0.;
+        common_paras_ptr->local_success_ratio = *success_rat + 0.; */
+        if (ksuccess_sum == 0) {
+            common_paras_ptr->local_av_cost = common_paras_ptr->local_total_cost;
+            common_paras_ptr->local_av_bb_cost = common_paras_ptr->local_bb_cost;
+            common_paras_ptr->local_av_timing_cost = common_paras_ptr->local_timing_cost;
+            common_paras_ptr->local_av_delay_cost = common_paras_ptr->local_delay_cost;
         } else {
-            *av_cost /= *success_sum;
-            *av_bb_cost /= *success_sum;
-            *av_timing_cost /= *success_sum;
-            *av_delay_cost /= *success_sum;
+            common_paras_ptr->local_av_cost /= ksuccess_sum;
+            common_paras_ptr->local_av_bb_cost /= ksuccess_sum;
+            common_paras_ptr->local_av_timing_cost /= ksuccess_sum;
+            common_paras_ptr->local_av_delay_cost /= ksuccess_sum;
         }
 
-        *std_dev = get_std_dev(*success_sum, *sum_of_squares, *av_cost);
+        const double ksum_of_squares = common_paras_ptr->local_sum_of_squares;
+        const double kav_cost = common_paras_ptr->local_av_cost;
+        common_paras_ptr->local_std_dev = get_std_dev(ksuccess_sum,
+                                                      ksum_of_squares,
+                                                      kav_cost);
+        const double ksuccess_ratio = common_paras_ptr->local_success_ratio;
+        update_rlim(&(common_paras_ptr->local_range_limit),
+                    ksuccess_ratio);
 
-        update_rlim(range_limit, *success_rat);
-
-        if (placer_opts.place_algorithm == NET_TIMING_DRIVEN_PLACE ||
-                placer_opts.place_algorithm == PATH_TIMING_DRIVEN_PLACE) {
-            *crit_exponent = (1 - (*range_limit - *final_rlim) *
-                                (*inverse_delta_rlim)) *
-                (placer_opts.td_place_exp_last - placer_opts.td_place_exp_first) +
-                    placer_opts.td_place_exp_first;
+        const place_algorithm_t kplace_algorithm =
+            common_paras_ptr->local_placer_opts.place_algorithm;
+        const double krange_limit = common_paras_ptr->local_range_limit;
+        const double kfinal_rlim = common_paras_ptr->local_final_rlim;
+        const double kinverse_delta_rlim = common_paras_ptr->local_inverse_delta_rlim;
+        const double ktd_place_exp_last =
+            common_paras_ptr->local_placer_opts.td_place_exp_last;
+        const double ktd_place_exp_first =
+            common_paras_ptr->local_placer_opts.td_place_exp_first;
+        if (kplace_algorithm == NET_TIMING_DRIVEN_PLACE
+                || kplace_algorithm == PATH_TIMING_DRIVEN_PLACE) {
+            common_paras_ptr->local_crit_exponent =
+                (1 - (krange_limit - kfinal_rlim) * kinverse_delta_rlim)
+                    * (ktd_place_exp_last - ktd_place_exp_first)
+                        + ktd_place_exp_first;
         }
 
-
-        if (*t != 0) {
-            *oldt = *t;     // for finding and printing alpha.
-            update_t_parallel(t,
-                              inner_iter_num,
-                              0,
-                              *success_rat,
+        if (common_paras_ptr->local_temper != 0) {
+            /* for finding and printing alpha. */
+            common_paras_ptr->local_old_temper = common_paras_ptr->local_temper;
+            /* update both temperature and inner_iter_num */
+            update_t_parallel(&(common_paras_ptr->local_temper),
+                              inner_iter_num_ptr,
+                              0, /* why range_limit is 0? */
+                              ksuccess_ratio,
                               input_args->annealing_sched);
         }
 
+        const double kold_t = common_paras_ptr->local_old_temper;
+        const double kav_bb_cost = common_paras_ptr->local_av_bb_cost;
+        const double kav_timing_cost = common_paras_ptr->local_av_timing_cost;
+        const double kav_delay_cost = common_paras_ptr->local_av_delay_cost;
+        const double kstd_dev = common_paras_ptr->local_std_dev;
+        const double kcrit_exponent = common_paras_ptr->local_crit_exponent;
+        const int ktotal_iter = common_paras_ptr->local_total_iter;
 #ifndef SPEC
         printf
         ("%11.5g  %10.6g %11.6g  %11.6g  %11.6g %11.6g %11.4g %9.4g %8.3g  %7.4g  %7.4g  %10d  ",
-         *oldt, *av_cost, *av_bb_cost, *av_timing_cost, *av_delay_cost,
-         place_delay_value, max_delay, *success_rat, *std_dev, *range_limit,
-         *crit_exponent, *tot_iter);
-#endif
-
-
-#ifndef SPEC
-        printf("%7.4g\n", *t / *oldt);
+         kold_t,
+         kav_cost,
+         kav_bb_cost,
+         kav_timing_cost,
+         kav_delay_cost,
+         common_paras_ptr->local_place_delay_value,
+         common_paras_ptr->local_max_delay,
+         ksuccess_ratio,
+         kstd_dev,
+         krange_limit,
+         kcrit_exponent,
+         ktotal_iter);
 #endif
 
         char msg[BUFSIZE];
+        const double kt = common_paras_ptr->local_temper;
         sprintf(msg,
                 "Cost: %g  BB Cost %g  TD Cost %g  Temperature: %g  max_delay: %g",
-                *cost, *bb_cost, *timing_cost, *t, max_delay);
-        update_screen(MINOR, msg, PLACEMENT, FALSE);
+                common_paras_ptr->local_total_cost,
+                common_paras_ptr->local_bb_cost,
+                common_paras_ptr->local_timing_cost,
+                kt,
+                common_paras_ptr->local_max_delay);
 
-        if (*t != 0.0) {
-            *(input_args->inner_iter_num) = *inner_iter_num;
-            *(input_args->exit) = exit_crit(*t,
-                                            *av_cost,
+        update_screen(MINOR,
+                      msg,
+                      PLACEMENT,
+                      FALSE);
+
+        if (kt != 0.0) {
+            *(input_args->inner_iter_num) = *inner_iter_num_ptr;
+            *(input_args->exit) = exit_crit(kt,
+                                            kav_cost,
                                             input_args->annealing_sched);
-            *(input_args->t) = *t;
-
+            *(input_args->t) = kt;
             if (*(input_args->exit) == 0) {
-                *(input_args->t) = *t;
+                *(input_args->t) = kt;
+            } else {
+                *(input_args->t) = 0.0;
             }
 
-            else {
-                *(input_args->t) = 0.;
-            }
-
-            *(input_args->av_cost) = *av_cost;
-            *(input_args->av_bb_cost) = *av_bb_cost;
-            *(input_args->av_timing_cost) = *av_timing_cost;
-            *(input_args->av_delay_cost) = *av_delay_cost;
-            *(input_args->std_dev) = *std_dev;
-            *(input_args->range_limit ) = *range_limit;
-            *(input_args->crit_exponent) = *crit_exponent;
-            *(input_args->success_rat) = *success_rat;
-            *(input_args->tot_iter) = *tot_iter;
+            *(input_args->av_cost) = kav_cost;
+            *(input_args->av_bb_cost) = kav_bb_cost;
+            *(input_args->av_timing_cost) = kav_timing_cost;
+            *(input_args->av_delay_cost) = kav_delay_cost;
+            *(input_args->std_dev) = kstd_dev;
+            *(input_args->range_limit ) = krange_limit;
+            *(input_args->crit_exponent) = kcrit_exponent;
+            *(input_args->success_rat) = ksuccess_ratio;
+            *(input_args->tot_iter) = ktotal_iter;
         }
 
 #ifdef VERBOSE
         dump_clbs();
 #endif
-    }
-}
+    } /* end of if(kthread_id == 0) */
+} /* end of static void update_and_print_common_paras(const int kthread_id,..) */
 

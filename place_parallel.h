@@ -155,23 +155,6 @@ typedef struct s_thread_local_data_for_swap {
     double**        m_local_temp_point_to_point_delay_cost;
 } __attribute__((aligned(64))) thread_local_data_for_swap_t;
 
-
-/* I'd like to use the following struct to replace      *
- * int* region_x_boundary[3]; int* region_y_boundary[3] *
- * , which used to label the 4 boundaries usd for sub   *
- * regions in each region.                              */
-typedef struct s_region_x_boundary {
-    int x_left;
-    int x_middle;
-    int x_right;
-} region_x_boundary_t;
-
-typedef struct s_region_y_boundary {
-    int y_bottom;
-    int y_middle;
-    int y_top;
-} region_y_boundary_t;
-
 /* local data for inside the try_swap loop
 struct swap {
     int x_to, y_to, z_to, to_block;
@@ -212,10 +195,6 @@ void try_place_use_multi_threads(placer_opts_t placer_opts,
                                  subblock_data_t* subblock_data_ptr,
                                  t_mst_edge** * mst,
                                  operation_types_t operation);
-
-void barrier_polling(int thread_id);
-
-void barrier_polling_reset();
 
 #endif
 

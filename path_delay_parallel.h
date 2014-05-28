@@ -8,8 +8,6 @@ double** alloc_and_load_timing_graph(timing_info_t timing_inf,
 
 t_linked_int* allocate_and_load_critical_path(void);
 
-void  find_fanin_parallel(int thread_id);
-
 unsigned long load_timing_graph_net_delays_parallel(double** net_delay,
                                                     int start,
                                                     int finish);

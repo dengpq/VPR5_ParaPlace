@@ -15,10 +15,10 @@ void compute_delay_lookup_tables(router_opts_t router_opts,
 
 void free_place_lookup_structs(void);
 
-extern double** delta_io_to_fb;
-extern double** delta_fb_to_fb;
-extern double** delta_fb_to_io;
-extern double** delta_io_to_io;
+extern double** delta_inpad_to_clb;
+extern double** delta_clb_to_clb;
+extern double** delta_clb_to_outpad;
+extern double** delta_inpad_to_outpad;
 
 #endif
 
