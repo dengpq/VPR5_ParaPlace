@@ -94,60 +94,16 @@ print_sink_delays(char* fname)
 }
 
 /**************************************/
-void
-load_criticalities_parallel(placer_opts_t placer_opts,
-                            double** net_slack,
-                            double max_delay,
-                            double crit_exponent,
-                            int start, int finish)
+/*set criticality values, returns the maximum criticality found */
+/*assumes that net_slack contains correct values, ie. assumes  *
+ *that load_net_slack has been called*/
+void load_criticalities(double** net_slack,
+                        double max_delay,
+                        double crit_exponent)
 {
-
-    /*set criticality values, returns the maximum criticality found */
-    /*assumes that net_slack contains correct values, ie. assumes  *
-     *that load_net_slack has been called*/
-
     int inet, ipin;
     double pin_crit;
-
-
-    for (inet = start; inet < finish; inet++) {
-
-        if (inet == OPEN) {
-            continue;
-        }
-
-        if (net[inet].is_global) {
-            continue;
-        }
-
-        for (ipin = 1; ipin <= net[inet].num_sinks; ipin++) {
-            /*clip the criticality to never go negative (could happen */
-            /*for a constant generator since it's slack is huge) */
-            pin_crit = max(1 - net_slack[inet][ipin] / max_delay, 0.);
-            timing_place_crit[inet][ipin] =
-                pow(pin_crit, crit_exponent);
-        }
-    }
-
-}
-void
-load_criticalities(placer_opts_t placer_opts,
-                   double** net_slack,
-                   double max_delay,
-                   double crit_exponent)
-{
-
-    /*set criticality values, returns the maximum criticality found */
-    /*assumes that net_slack contains correct values, ie. assumes  *
-     *that load_net_slack has been called*/
-
-    int inet, ipin;
-    double pin_crit;
-
-
-
     for (inet = 0; inet < num_nets; inet++) {
-
         if (inet == OPEN) {
             continue;
         }

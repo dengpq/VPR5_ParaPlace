@@ -12,15 +12,7 @@ void alloc_lookups_and_criticalities(chan_width_distr_t chan_width_dist,
                                      double***  net_delay,
                                      double***  net_slack);
 
-void load_criticalities_parallel(placer_opts_t placer_opts,
-                                 double** net_slack,
-                                 double max_delay,
-                                 double crit_exponent,
-                                 int start,
-                                 int finish);
-
-void load_criticalities(placer_opts_t placer_opts,
-                        double** net_slack,
+void load_criticalities(double** net_slack,
                         double max_delay,
                         double crit_exponent);
 
