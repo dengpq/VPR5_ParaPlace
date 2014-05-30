@@ -45,17 +45,16 @@ check_route(router_types_t route_type,
      * pins spanned by that net, and (3) that no routing resources are       *
      * oversubscribed (the occupancy of everything is recomputed from        *
      * scratch).                                                             */
-    int inet, ipin, max_pins, inode, prev_node;
-    boolean valid, connects;
+    int inet, ipin, inode, prev_node;
+    boolean connects;
     boolean* connected_to_route;    /* [0 .. num_rr_nodes-1] */
     trace_t* tptr;
-    boolean* pin_done;
     printf("\nChecking to ensure routing is legal ...\n");
     /* Recompute the occupancy from scratch and check for overuse of routing *
      * resources.  This was already checked in order to determine that this  *
      * is a successful routing, but I want to double check it here.          */
     recompute_occupancy_from_scratch(fb_opins_used_locally);
-    valid = feasible_routing();
+    boolean valid = feasible_routing();
 
     if (valid == FALSE) {
         printf
@@ -65,22 +64,22 @@ check_route(router_types_t route_type,
 
     check_locally_used_fb_opins(fb_opins_used_locally, route_type);
     connected_to_route = (boolean*) my_calloc(num_rr_nodes, sizeof(boolean));
-    max_pins = 0;
 
-    for (inet = 0; inet < num_nets; inet++) {
-        max_pins = max(max_pins, (net[inet].num_sinks + 1));
+    int max_pins = 0;
+    for (inet = 0; inet < num_nets; ++inet) {
+        max_pins = max(max_pins,
+                       (net[inet].num_net_pins+ 1));
     }
 
-    pin_done = (boolean*) my_malloc(max_pins * sizeof(boolean));
-
+    boolean* pin_done = (boolean*)my_malloc(max_pins * sizeof(boolean));
     /* Now check that all nets are indeed connected. */
-
     for (inet = 0; inet < num_nets; inet++) {
         if (net[inet].is_global) { /* Skip global nets. */
             continue;
         }
 
-        for (ipin = 0; ipin < (net[inet].num_sinks + 1); ipin++) {
+        const int knum_net_pins = net[inet].num_net_pins;
+        for (ipin = 0; ipin < knum_net_pins + 1; ++ipin) {
             pin_done[ipin] = FALSE;
         }
 
@@ -157,7 +156,7 @@ check_route(router_types_t route_type,
             exit(1);
         }
 
-        for (ipin = 0; ipin < (net[inet].num_sinks + 1); ipin++) {
+        for (ipin = 0; ipin < knum_net_pins + 1; ++ipin) {
             if (pin_done[ipin] == FALSE) {
                 printf
                 ("Error in check_route.  Net %d does not \n",
@@ -191,10 +190,11 @@ check_sink(int inode,
     ptc_num = rr_node[inode].ptc_num;   /* For sinks, ptc_num is the class */
     ifound = 0;
 
-    for (iblk = 0; iblk < type->capacity; iblk++) {
+    for (iblk = 0; iblk < type->capacity; ++iblk) {
         block_num = grid[i][j].blocks[iblk]; /* Hardcoded to one block */
 
-        for (ipin = 1; ipin < (net[inet].num_sinks + 1); ipin++) {
+        const int knum_net_pins = net[inet].num_net_pins;
+        for (ipin = 1; ipin < knum_net_pins + 1; ++ipin) {
             /* All net SINKs */
             if (net[inet].node_block[ipin] == block_num) {
                 node_block_pin = net[inet].node_block_pin[ipin];

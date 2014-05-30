@@ -540,9 +540,6 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
 {
     /* Allocated here because it goes into timing critical code where each memory allocation is expensive */
     /* Used to quickly determine valid swap columns */
-    printf("Before placement, Let's print the grid location...\n");
-    print_grid();
-
     int* x_lookup = (int*)my_malloc(num_grid_columns * sizeof(int));
 
     /*used to free net_delay if it is re-assigned */
@@ -615,7 +612,7 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
 
         if (placer_opts.place_algorithm == NET_TIMING_DRIVEN_PLACE) {
             for (inet = 0; inet < num_nets; ++inet)
-                for (ipin = 1; ipin <= net[inet].num_sinks; ++ipin) {
+                for (ipin = 1; ipin <= net[inet].num_net_pins; ++ipin) {
                     timing_place_crit[inet][ipin] = 0;    /*dummy crit values */
                 }
            /* first pass gets delay_cost, which is used in criticality *
@@ -882,13 +879,15 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
             placer_opts.place_algorithm == BOUNDING_BOX_PLACE) {
         /*need this done since the timing data has not been kept up to date*
          *in bounding_box mode */
-        for (inet = 0; inet < num_nets; ++inet)
-            for (ipin = 1; ipin <= net[inet].num_sinks; ++ipin) {
+        for (inet = 0; inet < num_nets; ++inet) {
+            const int knum_net_pins = net[inet].num_net_pins;
+            for (ipin = 1; ipin <= knum_net_pins; ++ipin) {
                 timing_place_crit[inet][ipin] = 0;    /*dummy crit values */
             }
+        }
 
         comp_td_costs(&timing_cost,
-                      &delay_cost);  /*computes point_to_point_delay_cost */
+                      &delay_cost); /*computes point_to_point_delay_cost */
     }
 
     double place_est_crit_delay = 0.0;
@@ -929,9 +928,12 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
             placer_opts.enable_timing_computations) {
         net_delay = remember_net_delay_original_ptr;
         free_placement_structs(placer_opts.place_cost_type,
-                               placer_opts.num_regions, old_region_occ_x,
-                               old_region_occ_y, placer_opts);
-        free_lookups_and_criticalities(&net_delay, &net_slack);
+                               placer_opts.num_regions,
+                               old_region_occ_x,
+                               old_region_occ_y,
+                               placer_opts);
+        free_lookups_and_criticalities(&net_delay,
+                                       &net_slack);
     }
 
     /* placement is done - find mst of all nets.
@@ -953,6 +955,8 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
             (*mst)[inet] = get_mst_of_net(inet);
         }
     }
+
+    print_grid();
 
     free(x_lookup);
 }  /* end of try_place_use_multi_threads() */
@@ -1482,12 +1486,13 @@ static void alloc_memory_for_swap_data(const int max_pins_per_fb,
 
         int inet = -1;
         for (inet = 0; inet < num_nets; ++inet) {
+            const int knum_net_pins = net[inet].num_net_pins;
             (swap_data_ptr->m_local_temp_point_to_point_delay_cost)[inet] =
-                    (double*)my_malloc(net[inet].num_sinks * sizeof(double));
+                    (double*)my_malloc(knum_net_pins * sizeof(double));
             --(swap_data_ptr->m_local_temp_point_to_point_delay_cost)[inet];
 
             (swap_data_ptr->m_local_temp_point_to_point_timing_cost)[inet] =
-                (double*)my_malloc(net[inet].num_sinks * sizeof(double));
+                (double*)my_malloc(knum_net_pins * sizeof(double));
             --(swap_data_ptr->m_local_temp_point_to_point_timing_cost)[inet];
         }
     }
@@ -2407,7 +2412,8 @@ static void compute_delta_td_cost_parallel(const int kfrom_block,
         } else { /* net_pin == 0 */
         /* this net is being driven by a moved block, recompute *
          * all point to point connections on this net. */
-            for (ipin = 1; ipin <= net[inet].num_sinks; ++ipin) {
+            const int knum_net_pins = net[inet].num_net_pins;
+            for (ipin = 1; ipin <= knum_net_pins; ++ipin) {
                 temp_delay = comp_td_point_to_point_delay_parallel(inet,
                                                                    ipin,
                                                                    local_block);
@@ -2461,7 +2467,8 @@ static void compute_delta_td_cost_parallel(const int kfrom_block,
             } else {  /* net_pin was driver_pin, so kto_block was a driver block */
                 /*this net is being driven by a moved block, recompute */
                 /*all point to point connections on this net. */
-                for (ipin = 1; ipin <= net[inet].num_sinks; ++ipin) {
+                const int knum_net_pins = net[inet].num_net_pins;
+                for (ipin = 1; ipin <= knum_net_pins; ++ipin) {
                     temp_delay = comp_td_point_to_point_delay_parallel(inet,
                                                                        ipin,
                                                                        local_block);
@@ -2502,11 +2509,11 @@ static unsigned long compute_td_costs_parallel_without_update_crit(double* timin
         /* for each net ... */
         if (net[inet].is_global == FALSE) {
             /* Do only if not global. */
-            const int sinks = net[inet].num_sinks;
-            local_work += sinks;
+            const int ksinks = net[inet].num_net_pins;
+            local_work += ksinks;
 
             int ipin = 0;
-            for (ipin = 1; ipin <= net[inet].num_sinks; ++ipin) {
+            for (ipin = 1; ipin <= ksinks; ++ipin) {
                 double temp_delay_cost = comp_td_point_to_point_delay(inet,
                                                                      ipin);
                 double temp_timing_cost =
@@ -2548,11 +2555,11 @@ static unsigned long compute_td_costs_parallel_with_update_crit(double* timing_c
     for (inet = start_net; inet < finish_net; ++inet) {
         if (!net[inet].is_global) {
             /* Do only if not global. */
-            const int sinks = net[inet].num_sinks;
-            local_work += sinks;
+            const int ksinks = net[inet].num_net_pins;
+            local_work += ksinks;
 
             int ipin = 0;
-            for (ipin = 1; ipin <= sinks; ++ipin) {
+            for (ipin = 1; ipin <= ksinks; ++ipin) {
                 double pin_crit = max(1 - net_slack[inet][ipin] / max_delay,
                                      0.0);
                 timing_place_crit[inet][ipin] = pow(pin_crit,
@@ -2623,10 +2630,10 @@ static void get_bb_from_scratch_parallel(int inet,
     int* plist = NULL;
     if (duplicate_pins[inet] == 0) {
         plist = net[inet].node_block;
-        n_pins = net[inet].num_sinks + 1;
+        n_pins = net[inet].num_net_pins + 1;
     } else {
         plist = unique_pin_list[inet];
-        n_pins = (net[inet].num_sinks + 1) - duplicate_pins[inet];
+        n_pins = (net[inet].num_net_pins + 1) - duplicate_pins[inet];
     }
 
     int x = local_block[plist[0]].x;
@@ -2723,7 +2730,8 @@ static void get_non_updateable_bb_parallel(int inet,
     int ymax = y;
 
     int k = 0;
-    for (k = 1; k < (net[inet].num_sinks + 1); ++k) {
+    const int knum_net_pins = net[inet].num_net_pins;
+    for (k = 1; k < knum_net_pins + 1; ++k) {
         x = local_block_ptr[net[inet].node_block[k]].x;
         y = local_block_ptr[net[inet].node_block[k]].y;
 
@@ -3057,7 +3065,7 @@ static int  try_swap_parallel(const double kt,
             continue;
         }
 
-        if (net[inet].num_sinks < SMALL_NET) {
+        if (net[inet].num_net_pins < SMALL_NET) {
             get_non_updateable_bb_parallel(inet,
                                            &bb_coord_new[bb_index],
                                            local_block);
@@ -3156,7 +3164,7 @@ static int  try_swap_parallel(const double kt,
             }
 
             local_bb_coord[inet] = bb_coord_new[bb_index];
-            if (net[inet].num_sinks >= SMALL_NET) {
+            if (net[inet].num_net_pins >= SMALL_NET) {
                 local_bb_edge[inet] = bb_edge_new[bb_index];
             }
             ++bb_index;
@@ -3347,8 +3355,10 @@ static void print_grid(void)
             const int  grid_capacity = grid_tile.type->capacity;
             const int  grid_height = grid_tile.type->height;
             const int  grid_max_sblks = grid_tile.type->max_subblocks;
-            fprintf(print_grid_ptr, "grid[%d][%d] is: %s, capacity: %d, height: %d, max_sblks: %d.\n",
-                    col, row, grid_name, grid_capacity, grid_height, grid_max_sblks);
+            const int  grid_usage = grid_tile.usage;
+            fprintf(print_grid_ptr, "grid[%d][%d] is: %s, capacity: %d, height: %d, max_sblks: %d, usage: %d.\n",
+                    col, row, grid_name, grid_capacity, grid_height,
+                    grid_max_sblks, grid_usage);
         }
     }
     fclose(print_grid_ptr);
@@ -3506,7 +3516,7 @@ static int count_connections()
         if (net[inet].is_global) {
             continue;
         }
-        count += net[inet].num_sinks;
+        count += net[inet].num_net_pins;
     }
 
     return count;
@@ -3533,7 +3543,8 @@ static void compute_net_pin_index_values(void)
             continue;
         }
 
-        for (netpin = 0; netpin <= net[inet].num_sinks; netpin++) {
+        const int knum_net_pins = net[inet].num_net_pins;
+        for (netpin = 0; netpin <= knum_net_pins; ++netpin) {
             int blk = net[inet].node_block[netpin];
             net_pin_index[blk][net[inet].node_block_pin[netpin]] = netpin;
         }
@@ -3796,7 +3807,7 @@ static int try_swap(double t,
             continue;
         }
 
-        if (net[inet].num_sinks < SMALL_NET) {
+        if (net[inet].num_net_pins < SMALL_NET) {
             get_non_updateable_bb(inet, &bb_coord_new[bb_index]);
         } else {
             if (net_block_moved[k] == FROM) {
@@ -3880,7 +3891,7 @@ static int try_swap(double t,
             }
 
             bb_coords[inet] = bb_coord_new[bb_index];
-            if (net[inet].num_sinks >= SMALL_NET) {
+            if (net[inet].num_net_pins >= SMALL_NET) {
                 bb_num_on_edges[inet] = bb_edge_new[bb_index];
             }
 
@@ -4092,7 +4103,7 @@ static boolean find_to(int x_from,
     }
 #endif
 
-    int x_rel, y_rel, iside, iplace; 
+    int x_rel, y_rel, iside, iplace;
     do {
         /* Until (x_to, y_to) different from (x_from, y_from) */
         if (type == IO_TYPE) {
@@ -4327,7 +4338,7 @@ static void update_td_cost(int from_block,
         } else {
             /*this net is being driven by a moved block, recompute */
             /*all point to point connections on this net. */
-            for (ipin = 1; ipin <= net[inet].num_sinks; ipin++) {
+            for (ipin = 1; ipin <= net[inet].num_net_pins; ++ipin) {
 
                 point_to_point_delay_cost[inet][ipin] =
                     temp_point_to_point_delay_cost[inet][ipin];
@@ -4368,7 +4379,7 @@ static void update_td_cost(int from_block,
             } else {
                 /*this net is being driven by a moved block, recompute */
                 /*all point to point connections on this net. */
-                for (ipin = 1; ipin <= net[inet].num_sinks; ipin++) {
+                for (ipin = 1; ipin <= net[inet].num_net_pins; ++ipin) {
 
                     point_to_point_delay_cost[inet][ipin] =
                         temp_point_to_point_delay_cost[inet][ipin];
@@ -4432,7 +4443,7 @@ static void comp_delta_td_cost(int from_block,
         } else {
             /*this net is being driven by a moved block, recompute */
             /*all point to point connections on this net. */
-            for (ipin = 1; ipin <= net[inet].num_sinks; ++ipin) {
+            for (ipin = 1; ipin <= net[inet].num_net_pins; ++ipin) {
                 double temp_delay = comp_td_point_to_point_delay(inet,
                                                                 ipin);
                 temp_point_to_point_delay_cost[inet][ipin] = temp_delay;
@@ -4484,7 +4495,7 @@ static void comp_delta_td_cost(int from_block,
             } else {
                 /*this net is being driven by a moved block, recompute */
                 /*all point to point connections on this net. */
-                for (ipin = 1; ipin <= net[inet].num_sinks; ++ipin) {
+                for (ipin = 1; ipin <= net[inet].num_net_pins; ++ipin) {
                     double temp_delay = comp_td_point_to_point_delay(inet,
                                                                     ipin);
                     temp_point_to_point_delay_cost[inet][ipin] = temp_delay;
@@ -4520,7 +4531,7 @@ static void comp_td_costs(double* timing_cost,
         if (net[inet].is_global == FALSE) {
             /* Do only if not global. */
             int ipin = 0;
-            for (ipin = 1; ipin <= net[inet].num_sinks; ++ipin) {
+            for (ipin = 1; ipin <= net[inet].num_net_pins; ++ipin) {
                 double temp_delay_cost = comp_td_point_to_point_delay(inet,
                                                                      ipin);
                 double temp_timing_cost =
@@ -4575,7 +4586,7 @@ static double comp_bb_cost(int method,
             /* Small nets don't use incremental updating on their bounding boxes, *
              * so they can use a fast bounding box calculator.                    */
 
-            if (net[k].num_sinks >= SMALL_NET && method == NORMAL) {
+            if (net[k].num_net_pins >= SMALL_NET && method == NORMAL) {
                 get_bb_from_scratch(k, &bb_coords[k],
                                     &bb_num_on_edges[k]);
             } else {
@@ -4673,10 +4684,10 @@ static void update_region_occ(int inet,
     double y_overlap, x_overlap, x_occupancy, y_occupancy;
     int imin, imax, jmin, jmax, i, j;
 
-    if (net[inet].num_sinks >= 50) {
-        crossing = 2.7933 + 0.02616 * ((net[inet].num_sinks + 1) - 50);
+    if (net[inet].num_net_pins >= 50) {
+        crossing = 2.7933 + 0.02616 * ((net[inet].num_net_pins + 1) - 50);
     } else {
-        crossing = cross_count[net[inet].num_sinks];
+        crossing = cross_count[net[inet].num_net_pins];
     }
 
     net_xmin = coords->xmin - 0.5;
@@ -4877,25 +4888,27 @@ static void alloc_and_load_placement_structs(int place_cost_type,
         for (inet = 0; inet < num_nets; ++inet) {
             /* in the following, subract one so index starts at *
              * 1 instead of 0 */
+            const int knum_net_pins = net[inet].num_net_pins;
             point_to_point_delay_cost[inet] =
-                    (double*)my_malloc(net[inet].num_sinks * sizeof(double));
+                    (double*)my_malloc(knum_net_pins * sizeof(double));
             --(point_to_point_delay_cost[inet]);
 
             temp_point_to_point_delay_cost[inet] =
-                (double*)my_malloc(net[inet].num_sinks * sizeof(double));
+                (double*)my_malloc(knum_net_pins * sizeof(double));
             --(temp_point_to_point_delay_cost[inet]);
 
             point_to_point_timing_cost[inet] =
-                (double*)my_malloc(net[inet].num_sinks * sizeof(double));
+                (double*)my_malloc(knum_net_pins * sizeof(double));
             --(point_to_point_timing_cost[inet]);
 
             temp_point_to_point_timing_cost[inet] =
-                (double*)my_malloc(net[inet].num_sinks * sizeof(double));
+                (double*)my_malloc(knum_net_pins* sizeof(double));
             --(temp_point_to_point_timing_cost[inet]);
         }
 
         for (inet = 0; inet < num_nets; ++inet) {
-            for (ipin = 1; ipin <= net[inet].num_sinks; ++ipin) {
+            const int knum_net_pins = net[inet].num_net_pins;
+            for (ipin = 1; ipin <= knum_net_pins; ++ipin) {
                 point_to_point_delay_cost[inet][ipin] = 0;
                 temp_point_to_point_delay_cost[inet][ipin] = 0;
             }
@@ -5118,7 +5131,8 @@ static void alloc_and_load_unique_pin_list(void)
         int num_dup = 0;
 
         int ipin = -1;
-        for (ipin = 0; ipin <= net[inet].num_sinks; ++ipin) {
+        const int knum_net_pins = net[inet].num_net_pins;
+        for (ipin = 0; ipin <= knum_net_pins; ++ipin) {
             /* For a block, it may had more than 1 pin connect to a net. */
             int block_num = net[inet].node_block[ipin];
             ++times_listed[block_num];
@@ -5137,10 +5151,10 @@ static void alloc_and_load_unique_pin_list(void)
                 any_dups = 1;
             }
 
-            unique_pin_list[inet] = (int*)my_malloc((net[inet].num_sinks + 1
-                                                      - num_dup) * sizeof(int));
+            unique_pin_list[inet] = (int*)my_malloc((knum_net_pins + 1 - num_dup)
+                                                      * sizeof(int));
             int offset = 0;
-            for (ipin = 0; ipin <= net[inet].num_sinks; ++ipin) {
+            for (ipin = 0; ipin <= knum_net_pins; ++ipin) {
                 int block_num = net[inet].node_block[ipin];
                 /* If a block pin had added to unique_pin_list, then set it 0.
                  * Otherwise, it must add more than 1 time. */
@@ -5152,7 +5166,7 @@ static void alloc_and_load_unique_pin_list(void)
             }
         } else {
             /* No duplicates found. Reset times_listed. */
-            for (ipin = 0; ipin <= net[inet].num_sinks; ++ipin) {
+            for (ipin = 0; ipin <= knum_net_pins; ++ipin) {
                 int block_num = net[inet].node_block[ipin];
                 times_listed[block_num] = 0;
             }
@@ -5181,10 +5195,10 @@ get_bb_from_scratch(int inet,
      * of the bounding box.                                                     */
     if (duplicate_pins[inet] == 0) {
         plist = net[inet].node_block;
-        n_pins = net[inet].num_sinks + 1;
+        n_pins = net[inet].num_net_pins + 1;
     } else {
         plist = unique_pin_list[inet];
-        n_pins = (net[inet].num_sinks + 1) - duplicate_pins[inet];
+        n_pins = (net[inet].num_net_pins + 1) - duplicate_pins[inet];
     }
 
     x = block[plist[0]].x;
@@ -5272,16 +5286,14 @@ get_net_wirelength_estimate(int inet,
     double ncost, crossing;
     /* Get the expected "crossing count" of a net, based on its number *
      * of pins.  Extrapolate for very large nets.                      */
-
-    if (((net[inet].num_sinks + 1) > 50) && ((net[inet].num_sinks + 1) < 85)) {
-        crossing = 2.7933 + 0.02616 * ((net[inet].num_sinks + 1) - 50);
-    } else if ((net[inet].num_sinks + 1) >= 85) {
-        crossing =
-            2.7933 + 0.011 * (net[inet].num_sinks + 1) -
-            0.0000018 * (net[inet].num_sinks + 1) * (net[inet].num_sinks +
-                                                     1);
+    const int knum_net_pins = net[inet].num_net_pins;
+    if (((knum_net_pins + 1) > 50) && ((knum_net_pins + 1) < 85)) {
+        crossing = 2.7933 + 0.02616 * ((net[inet].num_net_pins + 1) - 50);
+    } else if ((knum_net_pins + 1) >= 85) {
+        crossing = 2.7933 + 0.011 * (knum_net_pins + 1) -
+                    0.0000018 * (knum_net_pins + 1) * (knum_net_pins + 1);
     } else {
-        crossing = cross_count[(net[inet].num_sinks + 1) - 1];
+        crossing = cross_count[(knum_net_pins + 1) - 1];
     }
 
     /* Could insert a check for xmin == xmax.  In that case, assume  *
@@ -5290,9 +5302,7 @@ get_net_wirelength_estimate(int inet,
 
     /* Cost = wire length along channel * cross_count / average      *
      * channel capacity.   Do this for x, then y direction and add.  */
-
     ncost = (bbptr->xmax - bbptr->xmin + 1) * crossing;
-
     ncost += (bbptr->ymax - bbptr->ymin + 1) * crossing;
 
     return (ncost);
@@ -5308,11 +5318,12 @@ static double get_net_cost(int inet,
     /* Get the expected "crossing count" of a net, based on its number *
      * of pins.  Extrapolate for very large nets.                      */
     double crossing = 0.0;
-    if ((net[inet].num_sinks + 1) > 50) {
+    const int knum_net_pins = net[inet].num_net_pins;
+    if ((knum_net_pins + 1) > 50) {
         /* crossing = 3.0; Old value  */
-        crossing = 2.7933 + 0.02616 * ((net[inet].num_sinks + 1) - 50);
+        crossing = 2.7933 + 0.02616 * ((knum_net_pins + 1) - 50);
     } else {
-        crossing = cross_count[(net[inet].num_sinks + 1) - 1];
+        crossing = cross_count[(knum_net_pins + 1) - 1];
     }
 
     /* Could insert a check for xmin == xmax.  In that case, assume  *
@@ -5351,7 +5362,8 @@ static void get_non_updateable_bb(int inet,
     int xmax = x;
     int ymax = y;
     int k = 0;
-    for (k = 1; k < (net[inet].num_sinks + 1); ++k) {
+    const int knum_net_pins = net[inet].num_net_pins;
+    for (k = 1; k < knum_net_pins + 1; ++k) {
         x = block[net[inet].node_block[k]].x;
         y = block[net[inet].node_block[k]].y;
 

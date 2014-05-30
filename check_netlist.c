@@ -87,7 +87,7 @@ void check_netlist(subblock_data_t* subblock_data_ptr)
             error++;
         }
 
-        if (net[i].num_sinks == 0) {
+        if (net[i].num_net_pins == 0) {
             printf("Error:  net %s has no fanout.\n", net[i].name);
             error++;
         }
@@ -123,16 +123,15 @@ check_connections_to_global_fb_pins(int inet)
     /* Checks that a global net (inet) connects only to global FB input pins  *
      * and that non-global nets never connects to a global FB pin.  Either    *
      * global or non-global nets are allowed to connect to pads.               */
-    int ipin, num_pins, iblk, node_block_pin, error;
-    num_pins = (net[inet].num_sinks + 1);
+    int ipin, iblk, node_block_pin, error;
+    const int knum_net_pins = (net[inet].num_net_pins + 1);
     error = 0;
 
     /* For now global signals can be driven by an I/O pad or any FB output       *
      * although a FB output generates a warning.  I could make a global FB      *
      * output pin type to allow people to make architectures that didn't have     *
      * this warning.                                                              */
-
-    for (ipin = 0; ipin < num_pins; ipin++) {
+    for (ipin = 0; ipin < knum_net_pins; ++ipin) {
         iblk = net[inet].node_block[ipin];
         node_block_pin = net[inet].node_block_pin[ipin];
 
@@ -163,7 +162,7 @@ check_connections_to_global_fb_pins(int inet)
                 printf("\tCLB pin is global, but net is not.\n\n");
             }
         }
-    }           /* End for all pins */
+    }  /* End for all pins */
 
     return (error);
 }

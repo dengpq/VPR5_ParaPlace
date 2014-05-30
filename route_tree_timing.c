@@ -475,11 +475,10 @@ update_net_delays_from_route_tree(double* net_delay,
 {
     /* Goes through all the sinks of this net and copies their Tdel values from *
      * the route_tree to the net_delay array.                                    */
-    int isink;
-    t_rt_node* sink_rt_node;
-
-    for (isink = 1; isink <= net[inet].num_sinks; isink++) {
-        sink_rt_node = rt_node_of_sink[isink];
+    const int knum_net_pins = net[inet].num_net_pins;
+    int isink = 0;
+    for (isink = 1; isink <= knum_net_pins; ++isink) {
+        t_rt_node* sink_rt_node = rt_node_of_sink[isink];
         net_delay[isink] = sink_rt_node->Tdel;
     }
 }

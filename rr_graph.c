@@ -999,7 +999,7 @@ alloc_net_rr_terminals(void)
 
     for (inet = 0; inet < num_nets; inet++) {
         net_rr_terminals[inet] =
-            (int*)my_chunk_malloc((net[inet].num_sinks + 1) *
+            (int*)my_chunk_malloc((net[inet].num_net_pins + 1) *
                                   sizeof(int), &rr_mem_chunk_list_head,
                                   &chunk_bytes_avail,
                                   &chunk_next_avail_mem);
@@ -1017,8 +1017,10 @@ load_net_rr_terminals(vector_t** * rr_node_indices)
     int inet, ipin, inode, iblk, i, j, node_block_pin, iclass;
     block_type_ptr type;
 
-    for (inet = 0; inet < num_nets; inet++) {
-        for (ipin = 0; ipin <= net[inet].num_sinks; ipin++) {
+    for (inet = 0; inet < num_nets; ++inet) {
+        const int knum_net_pins = net[inet].num_net_pins;
+
+        for (ipin = 0; ipin <= knum_net_pins; ++ipin) {
             iblk = net[inet].node_block[ipin];
             i = block[iblk].x;
             j = block[iblk].y;

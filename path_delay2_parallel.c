@@ -30,12 +30,12 @@ static int* alloc_and_load_tnode_fanin_and_check_edges(int* num_sinks_ptr)
     /* Allocates an array and fills it with the number of in-edges (inputs) to   *
      * each tnode.  While doing this it also checks that each tedge in the timing *
      * graph points to a valid tnode. Also counts the number of sinks.           */
-    int inode, iedge, to_node, num_edges, error, num_sinks;
+    int inode, iedge, to_node, num_edges;
     int* tnode_num_fanin;
     t_tedge* tedge;
     tnode_num_fanin = (int*)my_calloc(num_tnodes, sizeof(int));
-    error = 0;
-    num_sinks = 0;
+    int error = 0;
+    int num_sinks = 0;
 
     for (inode = 0; inode < num_tnodes; inode++) {
         num_edges = tnode[inode].num_edges;
@@ -296,7 +296,7 @@ print_critical_path_node(FILE* fp,
     if (type == FB_OPIN) {
         inet = block[iblk].nets[ipin];
         fprintf(fp, "Net to next node: #%d (%s).  Pins on net: %d.\n",
-                inet, net[inet].name, (net[inet].num_sinks + 1));
+                inet, net[inet].name, (net[inet].num_net_pins + 1));
     }
 
     if (type == INPAD_OPIN) {
@@ -305,7 +305,7 @@ print_critical_path_node(FILE* fp,
                                              isubblk].outputs[ipin];
         inet = block[iblk].nets[ipin];
         fprintf(fp, "Net to next node: #%d (%s).  Pins on net: %d.\n",
-                inet, net[inet].name, (net[inet].num_sinks + 1));
+                inet, net[inet].name, (net[inet].num_net_pins + 1));
     }
 
     fprintf(fp, "\n");

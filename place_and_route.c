@@ -50,9 +50,7 @@ void free_subblock_data(subblock_data_t* subblock_data_ptr);
 
 
 /************************* Subroutine Definitions ****************************/
-
-void
-place_and_route(operation_types_t operation,
+void place_and_route(operation_types_t operation,
                 placer_opts_t placer_opts,
                 char* place_file,
                 char* net_file,
@@ -276,7 +274,7 @@ static int binary_search_place_and_route(placer_opts_t placer_opts,
     vector_t** fb_opins_used_locally = alloc_route_structs(*subblock_data_ptr);
     trace_t** best_routing = alloc_saved_routing(fb_opins_used_locally,
                                                         &saved_clb_opins_used_locally);
-    
+
     double** net_delay = NULL;
     double** net_slack = NULL;
     if (timing_inf.timing_analysis_enabled) {

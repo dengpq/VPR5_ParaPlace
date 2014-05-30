@@ -563,8 +563,7 @@ drawplace(void)
 }
 
 
-static void
-drawnets(void)
+static void drawnets(void)
 {
     /* This routine draws the nets on the placement.  The nets have not *
      * yet been routed, so we just draw a chain showing a possible path *
@@ -576,8 +575,7 @@ drawnets(void)
 
     /* Draw the net as a star from the source to each sink. Draw from centers of *
      * blocks (or sub blocks in the case of IOs).                                */
-
-    for (inet = 0; inet < num_nets; inet++) {
+    for (inet = 0; inet < num_nets; ++inet) {
         if (net[inet].is_global) {
             continue;    /* Don't draw global nets. */
         }
@@ -586,7 +584,8 @@ drawnets(void)
         b1 = net[inet].node_block[0];   /* The DRIVER */
         get_block_center(b1, &x1, &y1);
 
-        for (ipin = 1; ipin < (net[inet].num_sinks + 1); ipin++) {
+        const int knum_net_pins = net[inet].num_net_pins;
+        for (ipin = 1; ipin < knum_net_pins + 1; ++ipin) {
             b2 = net[inet].node_block[ipin];
             get_block_center(b2, &x2, &y2);
             drawline(x1, y1, x2, y2);
@@ -1715,7 +1714,8 @@ highlight_blocks(double x,
             /* Fanout */
             net_color[netnum] = RED;
 
-            for (ipin = 1; ipin <= net[netnum].num_sinks; ipin++) {
+            const int knum_net_pins = net[netnum].num_net_pins;
+            for (ipin = 1; ipin <= knum_net_pins; ++ipin) {
                 fanblk = net[netnum].node_block[ipin];
                 block_color[fanblk] = RED;
             }

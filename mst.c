@@ -19,7 +19,7 @@ get_mst_of_net(int inet)
     t_mst_edge* min_spantree;
     boolean* in_mst;
     /* given the net number, find and return its minimum spanning tree */
-    num_pins_on_net = (net[inet].num_sinks + 1);
+    num_pins_on_net = (net[inet].num_net_pins + 1);
 
     if (num_pins_on_net > USHRT_MAX) {
         printf("Error: num_pins_on_net (%d) > USHRT_MAX(%u)\n",
@@ -92,21 +92,21 @@ min_dist_from_mst(int node_outside,
                   boolean* in_mst,
                   int* node_inside)
 {
-    int ipin, blk1, blk2, dist, closest_node_in_mst, shortest_dist;
+    int ipin, blk1, blk2, dist;
     /* given a node outside the mst this routine finds its shortest distance to the current partial
      * mst, as well as the corresponding node inside mst */
-    closest_node_in_mst = -1;
-    shortest_dist = -1;
+    int closest_node_in_mst = -1;
+    int shortest_dist = -1;
 
     /* search over all blocks inside mst */
-    for (ipin = 0; ipin < (net[inet].num_sinks + 1); ipin++) {
+    const int knum_net_pins = net[inet].num_net_pins;
+    for (ipin = 0; ipin < knum_net_pins + 1; ++ipin) {
         if (in_mst[ipin]) {
             blk1 = net[inet].node_block[node_outside];
             blk2 = net[inet].node_block[ipin];
-            dist =
-                ABS_DIFF(block[blk1].x,
-                         block[blk2].x) + ABS_DIFF(block[blk1].y,
-                                                   block[blk2].y);
+            dist = ABS_DIFF(block[blk1].x,
+                            block[blk2].x) + ABS_DIFF(block[blk1].y,
+                                                      block[blk2].y);
 
             if (closest_node_in_mst == -1) {
                 closest_node_in_mst = ipin;

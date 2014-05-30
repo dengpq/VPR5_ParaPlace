@@ -315,22 +315,20 @@ get_num_bends_and_length(int inet,
 }
 
 
-void
-print_wirelen_prob_dist(void)
+void print_wirelen_prob_dist(void)
 {
     /* Prints out the probability distribution of the wirelength / number   *
      * input pins on a net -- i.e. simulates 2-point net length probability *
      * distribution.                                                        */
-    double* prob_dist;
-    double norm_fac, two_point_length;
+    double two_point_length;
     int inet, bends, length, segments, index;
     double av_length;
-    int prob_dist_size, i, incr;
-    prob_dist_size = num_grid_columns + num_grid_rows + 10;
-    prob_dist = (double*)my_calloc(prob_dist_size, sizeof(double));
-    norm_fac = 0.;
+    int i, incr;
+    int     prob_dist_size = num_grid_columns + num_grid_rows + 10;
+    double* prob_dist = (double*)my_calloc(prob_dist_size, sizeof(double));
+    double norm_fac = 0.0;
 
-    for (inet = 0; inet < num_nets; inet++) {
+    for (inet = 0; inet < num_nets; ++inet) {
         if (net[inet].is_global == FALSE) {
             get_num_bends_and_length(inet, &bends, &length,
                                      &segments);
@@ -338,7 +336,7 @@ print_wirelen_prob_dist(void)
              *  if two_point_length = 1.9, add 0.9 of the pins to prob_dist[2] and *
              *  only 0.1 to prob_dist[1].                                          */
             two_point_length =
-                (double)length / (double)(net[inet].num_sinks);
+                (double)length / (double)(net[inet].num_net_pins);
             index = (int)two_point_length;
 
             if (index >= prob_dist_size) {
@@ -349,18 +347,15 @@ print_wirelen_prob_dist(void)
                 ("Realloc'ing to increase 2-pin wirelen prob distribution array\n");
                 incr = index - prob_dist_size + 2;
                 prob_dist_size += incr;
-                prob_dist =
-                    my_realloc(prob_dist,
-                               prob_dist_size * sizeof(double));
+                prob_dist = (double*)my_realloc(prob_dist,
+                                                prob_dist_size * sizeof(double));
 
-                for (i = prob_dist_size - incr; i < prob_dist_size;
-                        i++) {
+                for (i = prob_dist_size - incr; i < prob_dist_size; i++) {
                     prob_dist[i] = 0.0;
                 }
             }
 
-            prob_dist[index] +=
-                (net[inet].num_sinks) * (1 - two_point_length +
+            prob_dist[index] += (net[inet].num_net_pins) * (1 - two_point_length +
                                          index);
             index++;
 
@@ -372,9 +367,8 @@ print_wirelen_prob_dist(void)
                 ("Realloc'ing to increase 2-pin wirelen prob distribution array\n");
                 incr = index - prob_dist_size + 2;
                 prob_dist_size += incr;
-                prob_dist =
-                    my_realloc(prob_dist,
-                               prob_dist_size * sizeof(double));
+                prob_dist = (double*)my_realloc(prob_dist,
+                                                prob_dist_size * sizeof(double));
 
                 for (i = prob_dist_size - incr; i < prob_dist_size;
                         i++) {
@@ -382,9 +376,9 @@ print_wirelen_prob_dist(void)
                 }
             }
 
-            prob_dist[index] += (net[inet].num_sinks) * (1 - index +
-                                                         two_point_length);
-            norm_fac += net[inet].num_sinks;
+            prob_dist[index] += (net[inet].num_net_pins) * (1 - index +
+                                                             two_point_length);
+            norm_fac += net[inet].num_net_pins;
         }
     }
 

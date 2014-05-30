@@ -31,20 +31,17 @@ alloc_crit(linked_vptr_t** chunk_list_head_ptr)
      * [0..num_nets-1][1..num_pins-1].  I chunk the data to save space on large    *
      * problems.                                                                   */
 
-    double** local_crit;     /* [0..num_nets-1][1..num_pins-1] */
     double* tmp_ptr;
-    int inet;
-    int chunk_bytes_avail;
-    char* chunk_next_avail_mem;
 
     *chunk_list_head_ptr = NULL;
-    chunk_bytes_avail = 0;
-    chunk_next_avail_mem = NULL;
+    int   chunk_bytes_avail = 0;
+    char* chunk_next_avail_mem = NULL;
 
-    local_crit = (double**)my_malloc(num_nets * sizeof(double*));
+    double** local_crit = (double**)my_malloc(num_nets * sizeof(double*));
 
-    for (inet = 0; inet < num_nets; inet++) {
-        tmp_ptr = (double*)my_chunk_malloc((net[inet].num_sinks) *
+    int inet;
+    for (inet = 0; inet < num_nets; ++inet) {
+        tmp_ptr = (double*)my_chunk_malloc((net[inet].num_net_pins) *
                                           sizeof(double),
                                           chunk_list_head_ptr,
                                           &chunk_bytes_avail,
@@ -56,25 +53,17 @@ alloc_crit(linked_vptr_t** chunk_list_head_ptr)
 }
 
 /**************************************/
-static void
-free_crit(linked_vptr_t** chunk_list_head_ptr)
+static void free_crit(linked_vptr_t** chunk_list_head_ptr)
 {
-
     free_chunk_memory(*chunk_list_head_ptr);
     *chunk_list_head_ptr = NULL;
 }
 
 /**************************************/
-void
-print_sink_delays(char* fname)
+void print_sink_delays(char* fname)
 {
-
-
     int num_at_level, num_edges, inode, ilevel, i;
-    FILE* fp;
-
-    fp = my_fopen(fname, "w");
-
+    FILE* fp = my_fopen(fname, "w");
 
     for (ilevel = num_tnode_levels - 1; ilevel >= 0; ilevel--) {
         num_at_level = tnodes_at_level[ilevel].nelem;
@@ -103,16 +92,13 @@ void load_criticalities(double** net_slack,
 {
     int inet, ipin;
     double pin_crit;
-    for (inet = 0; inet < num_nets; inet++) {
-        if (inet == OPEN) {
+    for (inet = 0; inet < num_nets; ++inet) {
+        if (inet == OPEN || net[inet].is_global) {
             continue;
         }
 
-        if (net[inet].is_global) {
-            continue;
-        }
-
-        for (ipin = 1; ipin <= net[inet].num_sinks; ipin++) {
+        const int knum_net_pins = net[inet].num_net_pins;
+        for (ipin = 1; ipin <= knum_net_pins; ++ipin) {
             /*clip the criticality to never go negative (could happen */
             /*for a constant generator since it's slack is huge) */
             pin_crit = max(1 - net_slack[inet][ipin] / max_delay, 0.);

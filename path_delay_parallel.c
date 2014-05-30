@@ -153,8 +153,6 @@ static void build_block_output_tnode(int inode,
 
 
 /********************* Subroutine definitions *******************************/
-
-
 double** alloc_and_load_timing_graph(timing_info_t timing_inf,
                                      subblock_data_t subblock_data)
 {
@@ -245,20 +243,17 @@ double** alloc_and_load_timing_graph(timing_info_t timing_inf,
 }
 
 
+/* Allocates the net_slack structure.  Chunk allocated to save space.      */
 static double** alloc_net_slack(void)
 {
-
-    /* Allocates the net_slack structure.  Chunk allocated to save space.      */
-
-    double** net_slack;      /* [0..num_nets-1][1..num_pins-1]  */
     double* tmp_ptr;
+    /* [0..num_nets-1][1..num_pins-1]  */
+    double** net_slack = (double**)my_malloc(num_nets * sizeof(double*));
+
     int inet;
-
-    net_slack = (double**)my_malloc(num_nets * sizeof(double*));
-
-    for (inet = 0; inet < num_nets; inet++) {
+    for (inet = 0; inet < num_nets; ++inet) {
         tmp_ptr =
-            (double*)my_chunk_malloc(((net[inet].num_sinks + 1) - 1) *
+            (double*)my_chunk_malloc(((net[inet].num_net_pins + 1) - 1) *
                                     sizeof(double), &tedge_ch_list_head,
                                     &tedge_ch_bytes_avail,
                                     &tedge_ch_next_avail);
@@ -678,15 +673,14 @@ build_block_output_tnode(int inode,
     /* Sets the number of edges and the tedge array for an output pin from a      *
      * block.  This pin must be hooked to something -- i.e. not OPEN.            */
 
-    int iedge, to_blk, to_pin, to_node, num_edges, inet;
-    t_tedge* tedge;
+    int iedge, to_blk, to_pin, to_node;
 
-    inet = block[iblk].nets[ipin];  /* Won't be OPEN, as inode exists */
+    int inet = block[iblk].nets[ipin];  /* Won't be OPEN, as inode exists */
     assert(inet != OPEN);   /* Sanity check. */
 
     net_to_driver_tnode[inet] = inode;
 
-    num_edges = (net[inet].num_sinks + 1) - 1;
+    int num_edges = (net[inet].num_net_pins + 1) - 1;
     tnode[inode].num_edges = num_edges;
 
     tnode[inode].out_edges = (t_tedge*) my_chunk_malloc(num_edges *
@@ -695,9 +689,9 @@ build_block_output_tnode(int inode,
                                                         &tedge_ch_bytes_avail,
                                                         &tedge_ch_next_avail);
 
-    tedge = tnode[inode].out_edges;
-
-    for (iedge = 0; iedge < (net[inet].num_sinks + 1) - 1; iedge++) {
+    t_tedge* tedge = tnode[inode].out_edges;
+    const int knum_net_pins = net[inet].num_net_pins;
+    for (iedge = 0; iedge < knum_net_pins; ++iedge) {
         to_blk = net[inet].node_block[iedge + 1];
 
         to_pin = net[inet].node_block_pin[iedge + 1];
@@ -1123,7 +1117,8 @@ static boolean is_global_clock(int iblk,
     }
 
     int  ipin = 0;
-    for (ipin = 1; ipin < (net[inet].num_sinks + 1); ++ipin) {
+    const int knum_net_pins = net[inet].num_net_pins;
+    for (ipin = 1; ipin < knum_net_pins + 1; ++ipin) {
         int to_blk = net[inet].node_block[ipin];
         int to_pin = net[inet].node_block_pin[ipin];
         int isub = -1;
@@ -1150,12 +1145,13 @@ unsigned long load_timing_graph_net_delays_parallel(double** net_delay,
     for (inet = start_net; inet < finish_net; ++inet) {
         int inode = net_to_driver_tnode[inet];
         t_tedge* tedge = tnode[inode].out_edges;
-        sinks += (long)net[inet].num_sinks;
+        sinks += (long)net[inet].num_net_pins;
 
         /* Note that the edges of a tnode corresponding to a FB or INPAD opin must*
          * be in the same order as the pins of the net driven by the tnode.       */
         int ipin = 0;
-        for (ipin = 1; ipin < net[inet].num_sinks + 1; ++ipin) {
+        const int knum_net_pins = net[inet].num_net_pins;
+        for (ipin = 1; ipin < knum_net_pins + 1; ++ipin) {
             tedge[ipin - 1].Tdel = net_delay[inet][ipin];
             int to_node = tedge[ipin - 1].to_node;
 
@@ -1196,8 +1192,8 @@ void load_timing_graph_net_delays(double** net_delay)
 
         /* Note that the edges of a tnode corresponding to a FB or INPAD opin must  *
          * be in the same order as the pins of the net driven by the tnode.          */
-
-        for (ipin = 1; ipin < (net[inet].num_sinks + 1); ipin++) {
+        const int knum_net_pins = net[inet].num_net_pins;
+        for (ipin = 1; ipin < knum_net_pins + 1; ++ipin) {
             tedge[ipin - 1].Tdel = net_delay[inet][ipin];
         }
     }
@@ -1239,18 +1235,14 @@ void print_net_slack(char* fname,
 {
 
     /* Prints the net slacks into a file.                                     */
-
-    int inet, ipin;
-    FILE* fp;
-
-    fp = my_fopen(fname, "w");
-
+    FILE* fp = my_fopen(fname, "w");
     fprintf(fp, "Net #\tSlacks\n\n");
 
-    for (inet = 0; inet < num_nets; inet++) {
+    int inet, ipin;
+    for (inet = 0; inet < num_nets; ++inet) {
         fprintf(fp, "%5d", inet);
-
-        for (ipin = 1; ipin < (net[inet].num_sinks + 1); ipin++) {
+        const int knum_net_pins = net[inet].num_net_pins;
+        for (ipin = 1; ipin < knum_net_pins + 1; ++ipin) {
             fprintf(fp, "\t%g", net_slack[inet][ipin]);
         }
 

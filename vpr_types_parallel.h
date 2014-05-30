@@ -93,7 +93,7 @@ typedef enum e_pad_loc_type {
  *                 to  which each net terminal connects. */
 typedef struct s_net {
     char* name;
-    int  num_sinks; /* num_of_sink_pins, except the driver_pin */
+    int  num_net_pins;
     int* node_block;
     int* node_block_pin;
     boolean is_global;

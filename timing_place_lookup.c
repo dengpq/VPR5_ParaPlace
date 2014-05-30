@@ -255,12 +255,9 @@ get_longest_segment_length(detail_routing_arch_t det_routing_arch,
 }
 
 /**************************************/
-static void
-alloc_net(void)
+static void alloc_net(void)
 {
-
     int i, len;
-
     net = (net_t*)my_malloc(num_nets * sizeof(net_t));
 
     for (i = 0; i < NET_COUNT; i++) {
@@ -270,15 +267,13 @@ alloc_net(void)
         net[i].is_global = FALSE;
         strcpy(net[NET_USED].name, "TEMP_NET");
 
-        net[i].num_sinks = (BLOCK_COUNT - 1);
+        net[i].num_net_pins = (BLOCK_COUNT - 1);
         net[i].node_block = (int*)my_malloc(BLOCK_COUNT * sizeof(int));
         net[i].node_block[NET_USED_SOURCE_BLOCK] = NET_USED_SOURCE_BLOCK;   /*driving block */
         net[i].node_block[NET_USED_SINK_BLOCK] = NET_USED_SINK_BLOCK;   /*target block */
 
-        net[i].node_block_pin =
-            (int*)my_malloc(BLOCK_COUNT * sizeof(int));
+        net[i].node_block_pin = (int*)my_malloc(BLOCK_COUNT * sizeof(int));
         /*the values for this are allocated in assign_blocks_and_route_net */
-
     }
 }
 
@@ -621,26 +616,23 @@ assign_blocks_and_route_net(block_type_ptr source_type,
     /*returns the Tdel of this net */
     boolean is_routeable;
     int ipin;
-    double pres_fac, T_crit;
-    double net_delay_value;
-
-    int source_z_loc, sink_z_loc;
 
     /* Only one block per tile */
-    source_z_loc = 0;
-    sink_z_loc = 0;
+    int source_z_loc = 0;
+    int sink_z_loc = 0;
 
-    net_delay_value = IMPOSSIBLE;   /*set to known value for debug purposes */
+    double net_delay_value = IMPOSSIBLE;   /*set to known value for debug purposes */
 
     assign_locations(source_type, source_x_loc, source_y_loc, source_z_loc,
                      sink_type, sink_x_loc, sink_y_loc, sink_z_loc);
 
     load_net_rr_terminals(rr_node_indices);
 
-    T_crit = 1;
-    pres_fac = 0;       /* ignore congestion */
+    double T_crit = 1.0;
+    double pres_fac = 0;     /* ignore congestion */
 
-    for (ipin = 1; ipin <= net[NET_USED].num_sinks; ipin++) {
+    const int knum_net_pins = net[NET_USED].num_net_pins;
+    for (ipin = 1; ipin <= knum_net_pins; ++ipin) {
         net_slack[NET_USED][ipin] = 0;
     }
 

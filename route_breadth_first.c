@@ -127,7 +127,8 @@ breadth_first_route_net(int inet,
     tptr = NULL;
     remaining_connections_to_sink = 0;
 
-    for (i = 1; i <= net[inet].num_sinks; i++) {
+    const int knum_net_pins = net[inet].num_net_pins;
+    for (i = 1; i <= knum_net_pins; ++i) {
         /* Need n-1 wires to connect n pins */
         breadth_first_expand_trace_segment(tptr,
                                            remaining_connections_to_sink);

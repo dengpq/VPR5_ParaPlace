@@ -27,7 +27,7 @@ void sync_grid_to_blocks(IN int num_blocks,
                 /* If already allocated, leave it since size doesn't change */
                 if (NULL == grid[i][j].blocks) {
                     grid[i][j].blocks = (int*)my_malloc(sizeof(int) *
-                                                     grid[i][j].type->capacity);
+                                                        grid[i][j].type->capacity);
                     /* Set them as unconnected */
                     for (k = 0; k < grid[i][j].type->capacity; ++k) {
                         grid[i][j].blocks[k] = OPEN;
@@ -99,7 +99,7 @@ void sync_nets_to_blocks(IN int num_blocks,
             i = block_list[j].nets[k];
 
             if ( i >= 0 && RECEIVER == cur_type->class_inf[cur_type->pin_class[k]].type) {
-                ++net_list[i].num_sinks;
+                ++net_list[i].num_net_pins;
             }
         }
     }
@@ -114,14 +114,14 @@ void sync_nets_to_blocks(IN int num_blocks,
         }
 
         net_list[i].node_block =
-            (int*)my_malloc(sizeof(int) * (net_list[i].num_sinks + 1));
+            (int*)my_malloc(sizeof(int) * (net_list[i].num_net_pins + 1));
 
         if (net_list[i].node_block_pin) {
             free(net_list[i].node_block_pin);
         }
 
         net_list[i].node_block_pin =
-            (int*)my_malloc(sizeof(int) * (net_list[i].num_sinks + 1));
+            (int*)my_malloc(sizeof(int) * (net_list[i].num_net_pins + 1));
 
         next_sink[i] = 1;       /* First sink goes at position 1, since 0 is for driver */
     }

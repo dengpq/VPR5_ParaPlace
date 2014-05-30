@@ -565,8 +565,8 @@ mark_ends(int inet)
      * the same net to two inputs of an and-gate (and-gate inputs are logically *
      * equivalent, so both will connect to the same SINK).                      */
     int ipin, inode;
-
-    for (ipin = 1; ipin <= net[inet].num_sinks; ipin++) {
+    const int knum_net_pins = net[inet].num_net_pins;
+    for (ipin = 1; ipin <= knum_net_pins; ++ipin) {
         inode = net_rr_terminals[inet][ipin];
         rr_node_route_inf[inode].target_flag++;
     }
@@ -865,7 +865,8 @@ load_route_bb(int bb_factor)
         xmax = x;
         ymax = y;
 
-        for (k = 1; k <= net[inet].num_sinks; k++) {
+        const int knum_net_pins = net[inet].num_net_pins;
+        for (k = 1; k <= knum_net_pins; ++k) {
             x = block[net[inet].node_block[k]].x;
             y = block[net[inet].node_block[k]].y;
 
@@ -1234,7 +1235,8 @@ print_route(char* route_file)
             fprintf(fp, "\n\nNet %d (%s): global net connecting:\n\n",
                     inet, net[inet].name);
 
-            for (ipin = 0; ipin <= net[inet].num_sinks; ipin++) {
+            const int knum_net_pins = net[inet].num_net_pins;
+            for (ipin = 0; ipin <= knum_net_pins; ++ipin) {
                 block_num = net[inet].node_block[ipin];
                 node_block_pin = net[inet].node_block_pin[ipin];
                 iclass =

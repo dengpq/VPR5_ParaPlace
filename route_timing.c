@@ -67,14 +67,15 @@ try_timing_driven_route(router_opts_t router_opts,
     /* First do one routing iter ignoring congestion and marking all sinks  *
      * on each net as critical to get reasonable net Tdel estimates.            */
 
-    for (inet = 0; inet < num_nets; inet++) {
+    for (inet = 0; inet < num_nets; ++inet) {
+        const int knum_net_pins = net[inet].num_net_pins;
         if (net[inet].is_global == FALSE) {
-            for (ipin = 1; ipin <= net[inet].num_sinks; ipin++) {
+            for (ipin = 1; ipin <= knum_net_pins; ++ipin) {
                 net_slack[inet][ipin] = 0.;
             }
         } else {
             /* Set Tdel of global signals to zero. */
-            for (ipin = 1; ipin <= net[inet].num_sinks; ipin++) {
+            for (ipin = 1; ipin <= knum_net_pins; ++ipin) {
                 net_delay[inet][ipin] = 0.;
             }
         }
@@ -84,7 +85,7 @@ try_timing_driven_route(router_opts_t router_opts,
     pres_fac = router_opts.first_iter_pres_fac; /* Typically 0->ignore cong. */
 
     for (itry = 1; itry <= router_opts.max_router_iterations; itry++) {
-        for (inet = 0; inet < num_nets; inet++) {
+        for (inet = 0; inet < num_nets; ++inet) {
             if (net[inet].is_global == FALSE) {
                 /* Skip global nets. */
                 is_routable =
@@ -209,10 +210,10 @@ get_max_pins_per_net(void)
     int inet, max_pins_per_net;
     max_pins_per_net = 0;
 
-    for (inet = 0; inet < num_nets; inet++) {
+    for (inet = 0; inet < num_nets; ++inet) {
         if (net[inet].is_global == FALSE) {
             max_pins_per_net =
-                max(max_pins_per_net, (net[inet].num_sinks + 1));
+                max(max_pins_per_net, (net[inet].num_net_pins + 1));
         }
     }
 
@@ -238,7 +239,7 @@ timing_driven_route_net(int inet,
      * way resulted in overuse of resources (congestion).  If there is no way   *
      * to route this net, even ignoring congestion, it returns FALSE.  In this  *
      * case the rr_graph is disconnected and you can give up.                   */
-    int ipin, num_sinks, itarget, target_pin, target_node, inode;
+    int ipin, itarget, target_pin, target_node, inode;
     double target_criticality, old_tcost, new_tcost, largest_criticality,
           pin_crit;
     double old_back_cost, new_back_cost;
@@ -249,7 +250,8 @@ timing_driven_route_net(int inet,
     pathfinder_update_one_cost(trace_head[inet], -1, pres_fac);
     free_traceback(inet);
 
-    for (ipin = 1; ipin <= net[inet].num_sinks; ipin++) {
+    const int knum_net_pins = net[inet].num_net_pins;
+    for (ipin = 1; ipin <= knum_net_pins; ++ipin) {
         /* For all sinks */
         pin_crit = max(max_criticality - net_slack[ipin] / T_crit, 0.);
         pin_crit = pow(pin_crit, criticality_exp);
@@ -257,7 +259,7 @@ timing_driven_route_net(int inet,
         pin_criticality[ipin] = pin_crit;
     }
 
-    num_sinks = net[inet].num_sinks;
+    int num_sinks = net[inet].num_net_pins;
     heapsort(sink_order, pin_criticality, num_sinks);
     /* Update base costs according to fanout and criticality rules */
     largest_criticality = pin_criticality[sink_order[1]];
@@ -265,7 +267,7 @@ timing_driven_route_net(int inet,
     mark_ends(inet);        /* Only needed to check for multiply-connected SINKs */
     rt_root = init_route_tree_to_source(inet);
 
-    for (itarget = 1; itarget <= num_sinks; itarget++) {
+    for (itarget = 1; itarget <= num_sinks; ++itarget) {
         target_pin = sink_order[itarget];
         target_node = net_rr_terminals[inet][target_pin];
         target_criticality = pin_criticality[target_pin];
@@ -646,13 +648,12 @@ update_rr_base_costs(int inet,
 {
     /* Changes the base costs of different types of rr_nodes according to the  *
      * criticality, fanout, etc. of the current net being routed (inet).       */
-    double fanout, factor;
-    int index;
-    fanout = net[inet].num_sinks;
+    double fanout = net[inet].num_net_pins;
     /* Other reasonable values for factor include fanout and 1 */
-    factor = sqrt(fanout);
+    double factor = sqrt(fanout);
 
-    for (index = CHANX_COST_INDEX_START; index < num_rr_indexed_data; index++) {
+    int index = 0;
+    for (index = CHANX_COST_INDEX_START; index < num_rr_indexed_data; ++index) {
         if (rr_indexed_data[index].T_quadratic > 0.) {
             /* pass transistor */
             rr_indexed_data[index].base_cost =
@@ -678,8 +679,9 @@ timing_driven_check_net_delays(double** net_delay)
     net_delay_check = alloc_net_delay(&ch_list_head_net_delay_check);
     load_net_delay_from_routing(net_delay_check);
 
-    for (inet = 0; inet < num_nets; inet++) {
-        for (ipin = 1; ipin <= net[inet].num_sinks; ipin++) {
+    for (inet = 0; inet < num_nets; ++inet) {
+        const int knum_net_pins = net[inet].num_net_pins;
+        for (ipin = 1; ipin <= knum_net_pins; ++ipin) {
             if (net_delay_check[inet][ipin] == 0.) {
                 /* Should be only GLOBAL nets */
                 if (net_delay[inet][ipin] != 0.) {

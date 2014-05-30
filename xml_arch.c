@@ -231,6 +231,7 @@ static void CheckElement(IN ezxml_t Node,
                "element type of '%s'\n", Node->name, Node->parent->name,
                Name);
         exit(1);
+
     }
 }
 

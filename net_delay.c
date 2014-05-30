@@ -125,17 +125,15 @@ alloc_net_delay(linked_vptr_t** chunk_list_head_ptr)
      * problems.                                                                 */
     double** net_delay;      /* [0..num_nets-1][1..num_pins-1] */
     double* tmp_ptr;
-    int inet;
-    int chunk_bytes_avail;
-    char* chunk_next_avail_mem;
     *chunk_list_head_ptr = NULL;
-    chunk_bytes_avail = 0;
-    chunk_next_avail_mem = NULL;
+    int   chunk_bytes_avail = 0;
+    char* chunk_next_avail_mem = NULL;
     net_delay = (double**)my_malloc(num_nets * sizeof(double*));
 
-    for (inet = 0; inet < num_nets; inet++) {
+    int inet;
+    for (inet = 0; inet < num_nets; ++inet) {
         tmp_ptr =
-            (double*)my_chunk_malloc(((net[inet].num_sinks + 1) - 1) *
+            (double*)my_chunk_malloc(((net[inet].num_net_pins + 1) - 1) *
                                     sizeof(double), chunk_list_head_ptr,
                                     &chunk_bytes_avail,
                                     &chunk_next_avail_mem);
@@ -469,7 +467,8 @@ load_one_net_delay(double** net_delay,
     t_rc_node* rc_node;
     t_linked_rc_ptr* linked_rc_ptr, *next_ptr;
 
-    for (ipin = 1; ipin < (net[inet].num_sinks + 1); ipin++) {
+    const int knum_net_pins = net[inet].num_net_pins;
+    for (ipin = 1; ipin < knum_net_pins + 1; ++ipin) {
         inode = net_rr_terminals[inet][ipin];
         linked_rc_ptr = rr_node_to_rc_node[inode].next;
         rc_node = rr_node_to_rc_node[inode].rc_node;
@@ -518,8 +517,8 @@ load_one_constant_net_delay(double** net_delay,
 {
     /* Sets each entry of the net_delay array for net inet to delay_value.     */
     int ipin;
-
-    for (ipin = 1; ipin < (net[inet].num_sinks + 1); ipin++) {
+    const int knum_net_pins = net[inet].num_net_pins;
+    for (ipin = 1; ipin < knum_net_pins + 1; ++ipin) {
         net_delay[inet][ipin] = delay_value;
     }
 }
@@ -611,11 +610,12 @@ print_net_delay(double** net_delay,
     int inet, ipin;
     fp = my_fopen(fname, "w");
 
-    for (inet = 0; inet < num_nets; inet++) {
+    for (inet = 0; inet < num_nets; ++inet) {
         fprintf(fp, "Net: %d.\n", inet);
         fprintf(fp, "Delays:");
 
-        for (ipin = 1; ipin < (net[inet].num_sinks + 1); ipin++) {
+        const int knum_net_pins = net[inet].num_net_pins;
+        for (ipin = 1; ipin < knum_net_pins + 1; ++ipin) {
             fprintf(fp, " %g", net_delay[inet][ipin]);
         }
 

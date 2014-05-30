@@ -13,8 +13,7 @@ typedef struct relapos_rec_s {
 }
 relapos_rec_t;
 
-void
-print_relative_pos_distr(void)
+void print_relative_pos_distr(void)
 {
     /* Prints out the probability distribution of the relative locations of *
      * input pins on a net -- i.e. simulates 2-point net distance probability *
@@ -43,8 +42,8 @@ print_relative_pos_distr(void)
             src_x = block[net[inet].node_block[0]].x;
             src_y = block[net[inet].node_block[0]].y;
 
-            for (sink_pin = 1; sink_pin <= net[inet].num_sinks;
-                    sink_pin++) {
+            const int knum_net_pins = net[inet].num_net_pins;
+            for (sink_pin = 1; sink_pin <= knum_net_pins; ++sink_pin) {
                 dst_x = block[net[inet].node_block[sink_pin]].x;
                 dst_y = block[net[inet].node_block[sink_pin]].y;
                 del_x = ABS_DIFF(dst_x, src_x);

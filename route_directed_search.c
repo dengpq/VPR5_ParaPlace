@@ -158,8 +158,6 @@ directed_search_route_net(int inet,
      * lack of potential paths, rather than congestion), it returns FALSE, as    *
      * routing is impossible on this architecture.  Otherwise it returns TRUE.   */
     /* WMF: This is the directed search (A-star) version of maze router. */
-    int inode, remaining_connections_to_sink;
-    int itarget, target_pin, target_node;
     struct s_heap* current;
     trace_t* new_route_start_tptr;
     double old_tcost, new_tcost, old_back_cost, new_back_cost;
@@ -171,13 +169,16 @@ directed_search_route_net(int inet,
     pathfinder_update_one_cost(trace_head[inet], -1, pres_fac);
     free_traceback(inet);   /* kills trace, and set the trace head and tail to NULL */
     /* adding the SOURCE node to the heap with correct total cost */
-    target_pin = mst[inet][0].to_node;
-    target_node = net_rr_terminals[inet][target_pin];
+    int target_pin = mst[inet][0].to_node;
+    int target_node = net_rr_terminals[inet][target_pin];
     directed_search_add_source_to_heap(inet, target_node, astar_fac);
     mark_ends(inet);
-    remaining_connections_to_sink = 0;
 
-    for (itarget = 0; itarget < net[inet].num_sinks; itarget++) {
+    int remaining_connections_to_sink = 0;
+
+    const int knum_net_pins = net[inet].num_net_pins;
+    int itarget;
+    for (itarget = 0; itarget < knum_net_pins; ++itarget) {
         target_pin = mst[inet][itarget].to_node;
         target_node = net_rr_terminals[inet][target_pin];
         /*    printf ("Target #%d, pin number %d, target_node: %d.\n",
@@ -200,8 +201,7 @@ directed_search_route_net(int inet,
             return (FALSE);
         }
 
-        inode = current->index;
-
+        int inode = current->index;
         while (inode != target_node) {
             old_tcost = rr_node_route_inf[inode].path_cost;
             new_tcost = current->cost;
