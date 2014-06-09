@@ -7,20 +7,21 @@
 typedef struct {
     int to_node;
     double Tdel;
-} t_tedge;
+} edge_t;
 
 /* to_node: index of node at the sink end of this tedge.                      *
  * Tdel: Tdel to go to to_node along this tedge.                             */
 typedef struct {
-    t_tedge* out_edges;
-    t_tedge* in_edges;
-    int      num_edges;
-    int      num_parents;
+    edge_t* out_edges;
+    int      num_out_edges;
     double   arr_time;
     double   req_time;
+
+    edge_t* in_edges;
+    int      num_parents;
 } t_tnode;
 
-/* out_edges: [0..num_edges - 1].  Array of the edges leaving this tnode.    *
+/* out_edges: [0..num_edges - 1].  Array of the edges leaving this vertexes.    *
  * num_edges: Number of edges leaving this node.                             *
  * arr_time:  Arrival time of the last input signal to this node.               *
  * req_time:  Required arrival time of the last input signal to this node if    *
@@ -52,19 +53,19 @@ typedef struct {
     int   iblk;
 } t_tnode_descript;
 
-/* type:  What is this tnode? (Pad pin, clb pin, subblock pin, etc.)         *
- * ipin:  Number of the FB or subblock pin this tnode represents, if        *
+/* type:  What is this vertexes? (Pad pin, clb pin, subblock pin, etc.)         *
+ * ipin:  Number of the FB or subblock pin this vertexes represents, if        *
  *        applicable.                                                        *
- * isubblk: Number of the subblock this tnode is part of, if applicable.     *
- * iblk:  Number of the block (FB or PAD) this tnode is part of.            */
+ * isubblk: Number of the subblock this vertexes is part of, if applicable.     *
+ * iblk:  Number of the block (FB or PAD) this vertexes is part of.            */
 
 /*************** Variables shared only amongst path_delay_parallel.h modules ************/
-extern t_tnode* tnode;      /* [0..num_tnodes - 1] */
-extern t_tnode_descript* tnode_descript;    /* [0..num_tnodes - 1] */
-extern int num_tnodes;      /* Number of nodes in the timing graph */
+extern t_tnode* vertexes;      /* [0..num_of_vertexs - 1] */
+extern t_tnode_descript* tnode_descript;    /* [0..num_of_vertexs - 1] */
+extern int num_of_vertexs;    /* Number of nodes in the timing graph */
 
 
-/* [0..num_nets - 1].  Gives the index of the tnode that drives each net. */
+/* [0..num_nets - 1].  Gives the index of the vertexes that drives each net. */
 extern int* net_to_driver_tnode;
 
 
@@ -72,8 +73,9 @@ extern int* net_to_driver_tnode;
  * the timing graph, to make breadth-first searches easier.                  */
 extern vector_t* tnodes_at_level;
 extern int num_tnode_levels;    /* Number of levels in the timing graph. */
-/***************** Subroutines exported by this module ***********************/
 
+
+/***************** Subroutines exported by this module ***********************/
 int alloc_and_load_timing_graph_levels(void);
 
 void check_timing_graph(int num_const_gen,

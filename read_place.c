@@ -152,8 +152,7 @@ read_place(IN const char* place_file,
     fclose(infile);
 }
 
-void
-read_user_pad_loc(char* pad_loc_file)
+void read_user_pad_loc(char* pad_loc_file)
 {
     /* Reads in the locations of the IO pads from a file. */
     struct s_hash** hash_table, *h_ptr;
@@ -166,19 +165,19 @@ read_user_pad_loc(char* pad_loc_file)
     hash_table = alloc_hash_table();
 
     for (iblk = 0; iblk < num_blocks; iblk++) {
-        if (block[iblk].type == IO_TYPE) {
+        if (blocks[iblk].block_type == IO_TYPE) {
             h_ptr =
-                insert_in_hash_table(hash_table, block[iblk].name,
+                insert_in_hash_table(hash_table, blocks[iblk].name,
                                      iblk);
-            block[iblk].x = OPEN;   /* Mark as not seen yet. */
+            blocks[iblk].x = OPEN;   /* Mark as not seen yet. */
         }
     }
 
     for (i = 0; i <= num_grid_columns + 1; i++) {
         for (j = 0; j <= num_grid_rows + 1; j++) {
-            if (grid[i][j].type == IO_TYPE) {
+            if (clb_grids[i][j].grid_type == IO_TYPE) {
                 for (k = 0; k < IO_TYPE->capacity; k++) {
-                    grid[i][j].blocks[k] = OPEN;    /* Flag for err. check */
+                    clb_grids[i][j].in_blocks[k] = OPEN;    /* Flag for err. check */
                 }
             }
         }
@@ -239,7 +238,7 @@ read_user_pad_loc(char* pad_loc_file)
         i = xtmp;
         j = ytmp;
 
-        if (block[block_num].x != OPEN) {
+        if (blocks[block_num].x != OPEN) {
             printf
             ("Error:  line %d.  Block %s listed twice in pad file.\n",
              linenum, bname);
@@ -252,10 +251,10 @@ read_user_pad_loc(char* pad_loc_file)
             exit(1);
         }
 
-        block[block_num].x = i;  /* Will be reloaded by initial_placement anyway. */
-        block[block_num].y = j;  /* I need to set .x only as a done flag.         */
+        blocks[block_num].x = i;  /* Will be reloaded by initial_placement anyway. */
+        blocks[block_num].y = j;  /* I need to set .x only as a done flag.         */
 
-        if (grid[i][j].type != IO_TYPE) {
+        if (clb_grids[i][j].grid_type != IO_TYPE) {
             printf("Error:  attempt to place IO block %s in \n",
                    bname);
             printf("an illegal location (%d, %d).\n", i, j);
@@ -269,16 +268,15 @@ read_user_pad_loc(char* pad_loc_file)
             exit(1);
         }
 
-        grid[i][j].blocks[k] = block_num;
-        grid[i][j].usage++;
+        clb_grids[i][j].in_blocks[k] = block_num;
+        ++(clb_grids[i][j].m_usage);
         ptr = my_fgets(buf, BUFSIZE, fp);
     }
 
     for (iblk = 0; iblk < num_blocks; iblk++) {
-        if (block[iblk].type == IO_TYPE && block[iblk].x == OPEN) {
-            printf
-            ("Error:  IO block %s location was not specified in "
-             "the pad file.\n", block[iblk].name);
+        if (blocks[iblk].block_type == IO_TYPE && blocks[iblk].x == OPEN) {
+            printf ("Error:  IO block %s location was not specified in "
+                    "the pad file.\n", blocks[iblk].name);
             exit(1);
         }
     }
@@ -308,13 +306,13 @@ print_place(char* place_file,
     fprintf(fp, "#----------\t--\t--\t------\t------------\n");
 
     for (i = 0; i < num_blocks; i++) {
-        fprintf(fp, "%s\t", block[i].name);
+        fprintf(fp, "%s\t", blocks[i].name);
 
-        if (strlen(block[i].name) < 8) {
+        if (strlen(blocks[i].name) < 8) {
             fprintf(fp, "\t");
         }
 
-        fprintf(fp, "%d\t%d\t%d", block[i].x, block[i].y, block[i].z);
+        fprintf(fp, "%d\t%d\t%d", blocks[i].x, blocks[i].y, blocks[i].z);
         fprintf(fp, "\t#%d\n", i);
     }
 

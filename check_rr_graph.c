@@ -190,26 +190,23 @@ check_rr_graph(IN t_graph_type graph_type,
 }
 
 
-static boolean
-rr_node_is_global_clb_ipin(int inode)
+static boolean rr_node_is_global_clb_ipin(int inode)
 {
-    /* Returns TRUE if inode refers to a global FB input pin node.   */
-    int ipin;
-    block_type_ptr type;
-    type = grid[rr_node[inode].xlow][rr_node[inode].ylow].type;
-
     if (rr_node[inode].type != IPIN) {
         return (FALSE);
     }
+    /* Returns TRUE if inode refers to a global FB input pin node.   */
+    block_type_ptr type =
+        clb_grids[rr_node[inode].xlow][rr_node[inode].ylow].grid_type;
 
-    ipin = rr_node[inode].ptc_num;
+
+    int ipin = rr_node[inode].ptc_num;
     return (type->is_global_pin[ipin]);
 }
 
 
-void
-check_node(int inode,
-           router_types_t route_type)
+void check_node(int inode,
+                router_types_t route_type)
 {
     /* This routine checks that the rr_node is inside the grid and has a valid  *
      * pin number, etc.                                                         */
@@ -255,7 +252,7 @@ check_node(int inode,
         case IPIN:
         case OPIN:
             /* This is used later as well */
-            type = grid[xlow][ylow].type;
+            type = clb_grids[xlow][ylow].grid_type;
 
             if (type == NULL) {
                 printf

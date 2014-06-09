@@ -59,12 +59,10 @@ ShowSetup(IN t_options Options,
     num_p_outputs = 0;
 
     for (i = 0; i < num_blocks; i++) {
-        if (block[i].type == IO_TYPE) {
+        if (blocks[i].block_type == IO_TYPE) {
             for (j = 0; j < IO_TYPE->num_pins; j++) {
-                if (block[i].nets[j] != OPEN) {
-                    if (IO_TYPE->
-                            class_inf[IO_TYPE->pin_class[j]].
-                            type == DRIVER) {
+                if (blocks[i].nets[j] != OPEN) {
+                    if (IO_TYPE->class_inf[IO_TYPE->pin_class[j]].type == DRIVER) {
                         num_p_inputs++;
                     } else {
                         assert(IO_TYPE->

@@ -39,18 +39,14 @@ void print_netlist(char* foutput,
 
     /* Count I/O input and output pads */
     for (i = 0; i < num_blocks; i++) {
-        if (block[i].type == IO_TYPE) {
+        if (blocks[i].block_type == IO_TYPE) {
             for (j = 0; j < IO_TYPE->num_pins; j++) {
-                if (block[i].nets[j] != OPEN) {
-                    if (IO_TYPE->
-                            class_inf[IO_TYPE->pin_class[j]].
-                            type == DRIVER) {
+                if (blocks[i].nets[j] != OPEN) {
+                    if (IO_TYPE->class_inf[IO_TYPE->pin_class[j]].type == DRIVER) {
                         num_p_inputs++;
                     } else {
-                        assert(IO_TYPE->
-                               class_inf[IO_TYPE->
-                                         pin_class[j]].
-                               type == RECEIVER);
+                        assert(IO_TYPE->class_inf[IO_TYPE->pin_class[j]].type ==
+                                RECEIVER);
                         num_p_outputs++;
                     }
                 }
@@ -77,24 +73,24 @@ void print_netlist(char* foutput,
         fprintf(fp, "%d", knum_net_pins + 1);
 
         for (j = 0; j <= knum_net_pins; ++j)
-            fprintf(fp, "\t(%4d,%4d)", net[i].node_block[j],
-                    net[i].node_block_pin[j]);
+            fprintf(fp, "\t(%4d,%4d)", net[i].node_blocks[j],
+                    net[i].node_block_pins[j]);
     }
 
     fprintf(fp, "\nBlock\tName\t\tType\tPin Connections\n\n");
 
     for (i = 0; i < num_blocks; i++) {
-        fprintf(fp, "\n%d\t%s\t", i, block[i].name);
+        fprintf(fp, "\n%d\t%s\t", i, blocks[i].name);
 
-        if (strlen(block[i].name) < 8) {
+        if (strlen(blocks[i].name) < 8) {
             fprintf(fp, "\t");    /* Name field is 16 chars wide */
         }
 
-        fprintf(fp, "%s", block[i].type->name);
-        max_pin = block[i].type->num_pins;
+        fprintf(fp, "%s", blocks[i].block_type->name);
+        max_pin = blocks[i].block_type->num_pins;
 
         for (j = 0; j < max_pin; j++) {
-            print_pinnum(fp, block[i].nets[j]);
+            print_pinnum(fp, blocks[i].nets[j]);
         }
     }
 
@@ -106,17 +102,17 @@ void print_netlist(char* foutput,
 
     for (i = 0; i < num_blocks; i++) {
         fprintf(fp, "\nBlock: %d (%s)\tNum_subblocks: %d\n", i,
-                block[i].name, num_subblocks_per_block[i]);
+                blocks[i].name, num_subblocks_per_block[i]);
         /* Print header. */
         fprintf(fp, "Index\tName\t\tInputs");
 
-        for (j = 0; j < block[i].type->max_subblock_inputs; j++) {
+        for (j = 0; j < blocks[i].block_type->max_subblock_inputs; j++) {
             fprintf(fp, "\t");
         }
 
         fprintf(fp, "Outputs");
 
-        for (j = 0; j < block[i].type->max_subblock_outputs; j++) {
+        for (j = 0; j < blocks[i].block_type->max_subblock_outputs; j++) {
             fprintf(fp, "\t");
         }
 
@@ -131,12 +127,12 @@ void print_netlist(char* foutput,
                 fprintf(fp, "\t");    /* Name field is 16 characters */
             }
 
-            for (ipin = 0; ipin < block[i].type->max_subblock_inputs;
+            for (ipin = 0; ipin < blocks[i].block_type->max_subblock_inputs;
                     ipin++) {
                 print_pinnum(fp, subblock_inf[i][j].inputs[ipin]);
             }
 
-            for (ipin = 0; ipin < block[i].type->max_subblock_outputs;
+            for (ipin = 0; ipin < blocks[i].block_type->max_subblock_outputs;
                     ipin++) {
                 print_pinnum(fp, subblock_inf[i][j].outputs[ipin]);
             }

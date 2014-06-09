@@ -39,13 +39,13 @@ void print_relative_pos_distr(void)
 
     for (inet = 0; inet < num_nets; inet++) {
         if (net[inet].is_global == FALSE) {
-            src_x = block[net[inet].node_block[0]].x;
-            src_y = block[net[inet].node_block[0]].y;
+            src_x = blocks[net[inet].node_blocks[0]].x;
+            src_y = blocks[net[inet].node_blocks[0]].y;
 
             const int knum_net_pins = net[inet].num_net_pins;
             for (sink_pin = 1; sink_pin <= knum_net_pins; ++sink_pin) {
-                dst_x = block[net[inet].node_block[sink_pin]].x;
-                dst_y = block[net[inet].node_block[sink_pin]].y;
+                dst_x = blocks[net[inet].node_blocks[sink_pin]].x;
+                dst_y = blocks[net[inet].node_blocks[sink_pin]].y;
                 del_x = ABS_DIFF(dst_x, src_x);
                 del_y = ABS_DIFF(dst_y, src_y);
                 len = del_x + del_y;
@@ -62,11 +62,6 @@ void print_relative_pos_distr(void)
             }
         }
     }
-
-#ifdef PRINT_REL_POS_DISTR
-    out_bin_file =
-        fopen("/jayar/b/b5/fang/vpr_test/wirelength/relapos2.bin", "rb+");
-#endif /* PRINT_REL_POS_DISTR */
 
     for (len = 0; len <= num_grid_columns + num_grid_rows; len++) {
         sum = 0;

@@ -412,8 +412,8 @@ print_lambda(void)
     double lambda;
     block_type_ptr type;
 
-    for (block_num = 0; block_num < num_blocks; block_num++) {
-        type = block[block_num].type;
+    for (block_num = 0; block_num < num_blocks; ++block_num) {
+        type = blocks[block_num].block_type;
         assert(type != NULL);
 
         if (type != IO_TYPE) {
@@ -421,7 +421,7 @@ print_lambda(void)
                 iclass = type->pin_class[ipin];
 
                 if (type->class_inf[iclass].type == RECEIVER) {
-                    inet = block[block_num].nets[ipin];
+                    inet = blocks[block_num].nets[ipin];
 
                     if (inet != OPEN)   /* Pin is connected? */
                         if (net[inet].is_global == FALSE) { /* Not a global clock */

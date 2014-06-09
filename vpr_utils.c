@@ -21,16 +21,16 @@ void sync_grid_to_blocks(IN int num_blocks,
     /* Reset usage and allocate blocks list if needed */
     for (j = 0; j <= (num_grid_rows + 1); ++j) {
         for (i = 0; i <= (num_grid_columns + 1); ++i) {
-            grid[i][j].usage = 0;
+            grid[i][j].m_usage = 0;
 
-            if (grid[i][j].type != NULL) {
+            if (grid[i][j].grid_type != NULL) {
                 /* If already allocated, leave it since size doesn't change */
-                if (NULL == grid[i][j].blocks) {
-                    grid[i][j].blocks = (int*)my_malloc(sizeof(int) *
-                                                        grid[i][j].type->capacity);
+                if (NULL == grid[i][j].in_blocks) {
+                    grid[i][j].in_blocks = (int*)my_malloc(sizeof(int) *
+                                                        grid[i][j].grid_type->capacity);
                     /* Set them as unconnected */
-                    for (k = 0; k < grid[i][j].type->capacity; ++k) {
-                        grid[i][j].blocks[k] = OPEN;
+                    for (k = 0; k < grid[i][j].grid_type->capacity; ++k) {
+                        grid[i][j].in_blocks[k] = OPEN;
                     }
                 }
             }
@@ -40,44 +40,44 @@ void sync_grid_to_blocks(IN int num_blocks,
     /* Go through each block */
     for (i = 0; i < num_blocks; ++i) {
         /* Check range of block coords */
-        if (block[i].x < 0 || block[i].x > (num_grid_columns + 1)
-              || block[i].y < 0
-              || (block[i].y + block[i].type->height - 1) > (num_grid_rows + 1)
-              || block[i].z < 0 || block[i].z > (block[i].type->capacity)) {
+        if (blocks[i].x < 0 || blocks[i].x > (num_grid_columns + 1)
+              || blocks[i].y < 0
+              || (blocks[i].y + blocks[i].block_type->height - 1) > (num_grid_rows + 1)
+              || blocks[i].z < 0 || blocks[i].z > (blocks[i].block_type->capacity)) {
             printf(ERRTAG
                    "Block %d is at invalid location (%d, %d, %d)\n",
-                   i, block[i].x, block[i].y, block[i].z);
+                   i, blocks[i].x, blocks[i].y, blocks[i].z);
             exit(1);
         }
 
         /* Check types match */
-        if (block[i].type != grid[block[i].x][block[i].y].type) {
+        if (blocks[i].block_type != grid[blocks[i].x][blocks[i].y].grid_type) {
             printf(ERRTAG "A block is in a grid location "
-                   "(%d x %d) with a conflicting type.\n", block[i].x,
-                   block[i].y);
+                   "(%d x %d) with a conflicting type.\n", blocks[i].x,
+                   blocks[i].y);
             exit(1);
         }
 
         /* Check already in use */
-        if (OPEN != grid[block[i].x][block[i].y].blocks[block[i].z]) {
+        if (OPEN != grid[blocks[i].x][blocks[i].y].in_blocks[blocks[i].z]) {
             printf(ERRTAG
                    "Location (%d, %d, %d) is used more than once\n",
-                   block[i].x, block[i].y, block[i].z);
+                   blocks[i].x, blocks[i].y, blocks[i].z);
             exit(1);
         }
 
-        if (grid[block[i].x][block[i].y].offset != 0) {
+        if (grid[blocks[i].x][blocks[i].y].m_offset != 0) {
             printf(ERRTAG
                    "Large block not aligned in placment for block %d at (%d, %d, %d)",
-                   i, block[i].x, block[i].y, block[i].z);
+                   i, blocks[i].x, blocks[i].y, blocks[i].z);
             exit(1);
         }
 
         /* Set the block */
-        for (j = 0; j < block[i].type->height; j++) {
-            grid[block[i].x][block[i].y + j].blocks[block[i].z] = i;
-            grid[block[i].x][block[i].y + j].usage++;
-            assert(grid[block[i].x][block[i].y + j].offset == j);
+        for (j = 0; j < blocks[i].block_type->height; j++) {
+            grid[blocks[i].x][blocks[i].y + j].in_blocks[blocks[i].z] = i;
+            ++(grid[blocks[i].x][blocks[i].y + j].m_usage);
+            assert(grid[blocks[i].x][blocks[i].y + j].m_offset == j);
         }
     }
 }
@@ -93,7 +93,7 @@ void sync_nets_to_blocks(IN int num_blocks,
 
     /* Count the number of sinks for each net */
     for (j = 0; j < num_blocks; ++j) {
-        cur_type = block_list[j].type;
+        cur_type = block_list[j].block_type;
 
         for (k = 0; k < cur_type->num_pins; ++k) {
             i = block_list[j].nets[k];
@@ -109,38 +109,38 @@ void sync_nets_to_blocks(IN int num_blocks,
 
     for (i = 0; i < num_nets; ++i) {
         /* The list should be num_sinks + 1 driver. Re-alloc if already allocated. */
-        if (net_list[i].node_block) {
-            free(net_list[i].node_block);
+        if (net_list[i].node_blocks != NULL) {
+            free(net_list[i].node_blocks);
         }
 
-        net_list[i].node_block =
+        net_list[i].node_blocks =
             (int*)my_malloc(sizeof(int) * (net_list[i].num_net_pins + 1));
 
-        if (net_list[i].node_block_pin) {
-            free(net_list[i].node_block_pin);
+        if (net_list[i].node_block_pins != NULL) {
+            free(net_list[i].node_block_pins);
         }
 
-        net_list[i].node_block_pin =
+        net_list[i].node_block_pins =
             (int*)my_malloc(sizeof(int) * (net_list[i].num_net_pins + 1));
 
         next_sink[i] = 1;       /* First sink goes at position 1, since 0 is for driver */
     }
 
     for (j = 0; j < num_blocks; ++j) {
-        cur_type = block_list[j].type;
+        cur_type = block_list[j].block_type;
 
         for (k = 0; k < cur_type->num_pins; ++k) {
             i = block_list[j].nets[k];
 
-            if ( i >= 0 && RECEIVER == cur_type->class_inf[cur_type->pin_class[k]].type) {
+            if (i >= 0 && RECEIVER == cur_type->class_inf[cur_type->pin_class[k]].type) {
                 l = next_sink[i];
-                net_list[i].node_block[l] = j;
-                net_list[i].node_block_pin[l] = k;
+                net_list[i].node_blocks[l] = j;
+                net_list[i].node_block_pins[l] = k;
                 ++next_sink[i];
-            } else if ( i >= 0 ) {
+            } else if (i >= 0) {
                 assert(DRIVER == cur_type->class_inf[cur_type->pin_class[k]].type);
-                net_list[i].node_block[0] = j;
-                net_list[i].node_block_pin[0] = k;
+                net_list[i].node_blocks[0] = j;
+                net_list[i].node_block_pins[0] = k;
             }
         }
     }
@@ -155,11 +155,7 @@ is_opin(int ipin,
 {
 
     /* Returns TRUE if this clb pin is an output, FALSE otherwise. */
-
-    int iclass;
-
-    iclass = type->pin_class[ipin];
-
+    int iclass = type->pin_class[ipin];
     if (type->class_inf[iclass].type == DRIVER) {
         return (TRUE);
     } else {
@@ -173,13 +169,11 @@ get_class_range_for_block(IN int iblk,
                           OUT int* class_high)
 {
     /* Assumes that the placement has been done so each block has a set of pins allocated to it */
-    block_type_ptr type;
-
-    type = block[iblk].type;
+    block_type_ptr type = blocks[iblk].block_type;
     assert(type->num_class % type->capacity == 0);
-    *class_low = block[iblk].z * (type->num_class / type->capacity);
+    *class_low = blocks[iblk].z * (type->num_class / type->capacity);
     *class_high =
-        (block[iblk].z + 1) * (type->num_class / type->capacity) - 1;
+        (blocks[iblk].z + 1) * (type->num_class / type->capacity) - 1;
 }
 
 
@@ -192,7 +186,7 @@ load_one_fb_fanout_count(subblock_t* subblock_inf,
 {
 
     /* Loads the fanout counts for one block (iblk).  */
-    block_type_ptr type = block[iblk].type;
+    block_type_ptr type = blocks[iblk].block_type;
     int isub, ipin, conn_pin, opin;
     int internal_sub, internal_pin;
 
@@ -218,7 +212,7 @@ load_one_fb_fanout_count(subblock_t* subblock_inf,
             conn_pin = subblock_inf[isub].outputs[opin];
 
             if (conn_pin != OPEN) {
-                if (block[iblk].nets[conn_pin] != OPEN) {
+                if (blocks[iblk].nets[conn_pin] != OPEN) {
                     /* FB output is used */
                     num_uses_of_sblk_opin[isub][opin]++;
                 }
@@ -235,21 +229,15 @@ load_one_fb_fanout_count(subblock_t* subblock_inf,
                 } else {
                     /* Driven by sblk output in same fb */
                     internal_sub =
-                        (conn_pin -
-                         type->num_pins) /
-                        type->max_subblock_outputs;
+                      (conn_pin - type->num_pins) / type->max_subblock_outputs;
                     internal_pin =
-                        (conn_pin -
-                         type->num_pins) %
-                        type->max_subblock_outputs;
-                    num_uses_of_sblk_opin[internal_sub]
-                    [internal_pin]++;
+                      (conn_pin - type->num_pins) % type->max_subblock_outputs;
+                    num_uses_of_sblk_opin[internal_sub][internal_pin]++;
                 }
             }
         }       /* End for each sblk ipin */
 
         conn_pin = subblock_inf[isub].clock;    /* Now do clock pin */
-
         if (conn_pin != OPEN) {
             if (conn_pin < type->num_pins) {
                 /* Driven by FB ipin */
@@ -257,15 +245,12 @@ load_one_fb_fanout_count(subblock_t* subblock_inf,
             } else {
                 /* Driven by sblk output in same clb */
                 internal_sub =
-                    (conn_pin -
-                     type->num_pins) / type->max_subblock_outputs;
+                  (conn_pin - type->num_pins) / type->max_subblock_outputs;
                 internal_pin =
-                    (conn_pin -
-                     type->num_pins) % type->max_subblock_outputs;
-                num_uses_of_sblk_opin[internal_sub]
-                [internal_pin]++;
+                  (conn_pin - type->num_pins) % type->max_subblock_outputs;
+                num_uses_of_sblk_opin[internal_sub][internal_pin]++;
             }
         }
-
-    }           /* End for each subblock */
+    }  /* End for each subblock */
 }
+

@@ -511,7 +511,7 @@ build_rr_graph(IN t_graph_type graph_type,
 #endif
 
     /* Update rr_nodes capacities if global routing */
-    if (graph_type == GLOBAL) {
+    if (graph_type == GRAPH_GLOBAL) {
         for (i = 0; i < num_rr_nodes; i++) {
             if (rr_node[i].type == CHANX || rr_node[i].type == CHANY) {
                 rr_node[i].capacity = chan_width;
@@ -900,11 +900,11 @@ build_bidir_rr_opins(IN int i,
 
     /* OPIN edges need to be done at once so let the offset 0
      * block do the work. */
-    if (grid[i][j].offset > 0) {
+    if (grid[i][j].m_offset > 0) {
         return;
     }
 
-    type = grid[i][j].type;
+    type = grid[i][j].grid_type;
     Fc = Fc_out[type->index];
 
     for (ipin = 0; ipin < type->num_pins; ++ipin) {
@@ -1021,14 +1021,14 @@ load_net_rr_terminals(vector_t** * rr_node_indices)
         const int knum_net_pins = net[inet].num_net_pins;
 
         for (ipin = 0; ipin <= knum_net_pins; ++ipin) {
-            iblk = net[inet].node_block[ipin];
-            i = block[iblk].x;
-            j = block[iblk].y;
-            type = block[iblk].type;
+            iblk = net[inet].node_blocks[ipin];
+            i = blocks[iblk].x;
+            j = blocks[iblk].y;
+            type = blocks[iblk].block_type;
             /* In the routing graph, each (x, y) location has unique pins on it
              * so when there is capacity, blocks are packed and their pin numbers
              * are offset to get their actual rr_node */
-            node_block_pin = net[inet].node_block_pin[ipin];
+            node_block_pin = net[inet].node_block_pins[ipin];
             iclass = type->pin_class[node_block_pin];
             inode = get_rr_node_index(i, j, (ipin == 0 ? SOURCE : SINK),    /* First pin is driver */
                                       iclass, rr_node_indices);
@@ -1052,15 +1052,15 @@ alloc_and_load_rr_clb_source(vector_t** * rr_node_indices)
     rr_blk_source = (int**)my_malloc(num_blocks * sizeof(int*));
 
     for (iblk = 0; iblk < num_blocks; iblk++) {
-        type = block[iblk].type;
+        type = blocks[iblk].block_type;
         get_class_range_for_block(iblk, &class_low, &class_high);
         rr_blk_source[iblk] =
             (int*)my_malloc(type->num_class * sizeof(int));
 
         for (iclass = 0; iclass < type->num_class; iclass++) {
             if (iclass >= class_low && iclass <= class_high) {
-                i = block[iblk].x;
-                j = block[iblk].y;
+                i = blocks[iblk].x;
+                j = blocks[iblk].y;
 
                 if (type->class_inf[iclass].type == DRIVER) {
                     rr_type = SOURCE;
@@ -1091,17 +1091,16 @@ build_rr_sinks_sources(IN int i,
      * Loads IPIN to SINK edges, and SOURCE to OPIN edges */
     int ipin, iclass, inode, pin_num, to_node, num_edges;
     int num_class, num_pins;
-    block_type_ptr type;
     pin_class_t* class_inf;
     int* pin_class;
 
     /* Since we share nodes within a large block, only
      * start tile can initialize sinks, sources, and pins */
-    if (grid[i][j].offset > 0) {
+    if (grid[i][j].m_offset > 0) {
         return;
     }
 
-    type = grid[i][j].type;
+    block_type_ptr type = grid[i][j].grid_type;
     num_class = type->num_class;
     class_inf = type->class_inf;
     num_pins = type->num_pins;
@@ -2140,7 +2139,6 @@ build_unidir_rr_opins(IN int i,
     /* This routine returns a list of the opins rr_nodes on each
      * side/offset of the block. You must free the result with
      * free_matrix. */
-    block_type_ptr type;
     int ipin, iclass, ofs, chan, seg, max_len, inode;
     side_types_t side;
     rr_type_t chan_type;
@@ -2151,11 +2149,11 @@ build_unidir_rr_opins(IN int i,
     *Fc_clipped = FALSE;
 
     /* Only the base block of a set should use this function */
-    if (grid[i][j].offset > 0) {
+    if (grid[i][j].m_offset > 0) {
         return;
     }
 
-    type = grid[i][j].type;
+    block_type_ptr type = grid[i][j].grid_type;
 
     /* Go through each pin and find its fanout. */
     for (ipin = 0; ipin < type->num_pins; ++ipin) {

@@ -26,7 +26,7 @@
  * subblock pin within a FB also becomes a timing node.  Unused (OPEN) pins  *
  * don't create any timing nodes. If a subblock is used in combinational mode *
  * (i.e. its clock pin is open), I just hook the subblock input tnodes to the *
- * subblock output tnode.  If the subblock is used in sequential mode, I      *
+ * subblock output vertexes.  If the subblock is used in sequential mode, I      *
  * create two extra tnodes.  One is just the subblock clock pin, which is     *
  * connected to the subblock output.  This means that FFs don't generate      *
  * their output until their clock arrives.  For global clocks coming from an  *
@@ -38,10 +38,10 @@
  * the subblock inputs and has no fanout.                                     *
  *                                                                            *
  * One other subblock that needs special attention is a constant generator.   *
- * This has no used inputs, but its output is used.  I create an extra tnode, *
- * a dummy input, in addition to the output pin tnode.  The dummy tnode has   *
+ * This has no used inputs, but its output is used.  I create an extra vertexes, *
+ * a dummy input, in addition to the output pin vertexes.  The dummy vertexes has   *
  * no fanin.  Since constant generators really generate their outputs at T =  *
- * -infinity, I set the Tdel from the input tnode to the output to a large-  *
+ * -infinity, I set the Tdel from the input vertexes to the output to a large-  *
  * magnitude negative number.  This guarantees every block that needs the     *
  * output of a constant generator sees it available very early.               *
  *                                                                            *
@@ -158,7 +158,7 @@ double** alloc_and_load_timing_graph(timing_info_t timing_inf,
 {
 
     /* This routine builds the graph used for timing analysis.  Every fb or    *
-     * subblock pin is a timing node (tnode).  The connectivity between pins is *
+     * subblock pin is a timing node (vertexes).  The connectivity between pins is *
      * represented by timing edges (tedges).  All Tdel is marked on edges, not *
      * on nodes.  This routine returns an array that will store slack values:   *
      * net_slack[0..num_nets-1][1..num_pins-1].                                 */
@@ -168,7 +168,7 @@ double** alloc_and_load_timing_graph(timing_info_t timing_inf,
     int** num_uses_of_fb_ipin;  /* [0..num_blocks-1][0..type->num_pins-1]       */
     int** *num_uses_of_sblk_opin;   /* [0..num_blocks-1][0..type->num_subblocks][0..type->max_subblock_outputs] */
 
-    /* Array for mapping from a pin on a block to a tnode index. For pads, only *
+    /* Array for mapping from a pin on a block to a vertexes index. For pads, only *
      * the first two pin locations are used (input to pad is first, output of   *
      * pad is second).  For fbs, all OPEN pins on the fb have their mapping   *
      * set to OPEN so I won't use it by mistake.                                */
@@ -176,7 +176,7 @@ double** alloc_and_load_timing_graph(timing_info_t timing_inf,
     int** block_pin_to_tnode;   /* [0..num_blocks-1][0..num_pins-1]      */
 
 
-    /* Array for mapping from a pin on a subblock to a tnode index.  Unused     *
+    /* Array for mapping from a pin on a subblock to a vertexes index.  Unused     *
      * or nonexistent subblock pins have their mapping set to OPEN.             *
      * [0..num_blocks-1][0..num_subblocks_per_block-1][0..NUM_SUB_PIN_TYPES][0..total_subblock_pins-1]  */
 
@@ -218,7 +218,7 @@ double** alloc_and_load_timing_graph(timing_info_t timing_inf,
     alloc_and_load_fanout_counts(&num_uses_of_fb_ipin,
                                  &num_uses_of_sblk_opin, subblock_data);
 
-    num_tnodes = alloc_and_load_pin_mappings(&block_pin_to_tnode,
+    num_of_vertexs = alloc_and_load_pin_mappings(&block_pin_to_tnode,
                                              &snode_block_pin_to_tnode,
                                              subblock_data,
                                              num_uses_of_sblk_opin);
@@ -271,7 +271,7 @@ static int alloc_and_load_pin_mappings(int** *block_pin_to_tnode_ptr,
 {
 
     /* Allocates and loads the block_pin_to_tnode and snode_block_pin_to_tnode         *
-     * structures, and computes num_tnodes.                                     */
+     * structures, and computes num_of_vertexs.                                     */
 
     int iblk, isub, ipin, num_subblocks, opin, clk_pin;
     int curr_tnode;
@@ -293,13 +293,13 @@ static int alloc_and_load_pin_mappings(int** *block_pin_to_tnode_ptr,
     curr_tnode = 0;
 
     for (iblk = 0; iblk < num_blocks; iblk++) {
-        type = block[iblk].type;
+        type = blocks[iblk].block_type;
         block_pin_to_tnode[iblk] =
             (int*)my_malloc(type->num_pins * sizeof(int));
 
         /* First do the block mapping */
-        for (ipin = 0; ipin < block[iblk].type->num_pins; ipin++) {
-            if (block[iblk].nets[ipin] == OPEN) {
+        for (ipin = 0; ipin < blocks[iblk].block_type->num_pins; ipin++) {
+            if (blocks[iblk].nets[ipin] == OPEN) {
                 block_pin_to_tnode[iblk][ipin] = OPEN;
             } else {
                 block_pin_to_tnode[iblk][ipin] = curr_tnode;
@@ -403,7 +403,7 @@ free_pin_mappings(int** block_pin_to_tnode,
                   int* num_subblocks_per_block)
 {
 
-    /* Frees the arrays that map from pins to tnode coordinates. */
+    /* Frees the arrays that map from pins to vertexes coordinates. */
 
     int isub, iblk, isubtype, num_subblocks;
 
@@ -451,11 +451,11 @@ alloc_and_load_fanout_counts(int** *num_uses_of_fb_ipin_ptr,
 
     for (iblk = 0; iblk < num_blocks; iblk++) {
         num_uses_of_fb_ipin[iblk] =
-            (int*)my_calloc(block[iblk].type->num_pins, sizeof(int));
+            (int*)my_calloc(blocks[iblk].block_type->num_pins, sizeof(int));
         num_uses_of_sblk_opin[iblk] =
-            (int**)alloc_matrix(0, block[iblk].type->max_subblocks - 1,
+            (int**)alloc_matrix(0, blocks[iblk].block_type->max_subblocks - 1,
                                 0,
-                                block[iblk].type->max_subblock_outputs -
+                                blocks[iblk].block_type->max_subblock_outputs -
                                 1, sizeof(int));
 
         load_one_fb_fanout_count(subblock_inf[iblk],
@@ -476,12 +476,9 @@ free_fanout_counts(int** num_uses_of_fb_ipin,
 {
 
     /* Frees the fanout count arrays. */
-
-    int iblk;
-    block_type_ptr type;
-
-    for (iblk = 0; iblk < num_blocks; iblk++) {
-        type = block[iblk].type;
+    int iblk = -1;
+    for (iblk = 0; iblk < num_blocks; ++iblk) {
+        block_type_ptr type = blocks[iblk].block_type;
         free(num_uses_of_fb_ipin[iblk]);
         free_matrix(num_uses_of_sblk_opin[iblk], 0,
                     type->max_subblocks - 1, 0, sizeof(int));
@@ -506,8 +503,8 @@ alloc_and_load_tnodes_and_net_mapping(int** num_uses_of_fb_ipin,
     subblock_t** subblock_inf;
 
 
-    tnode = (t_tnode*) my_malloc(num_tnodes * sizeof(t_tnode));
-    tnode_descript = (t_tnode_descript*) my_malloc(num_tnodes *
+    vertexes = (t_tnode*) my_malloc(num_of_vertexs * sizeof(t_tnode));
+    tnode_descript = (t_tnode_descript*) my_malloc(num_of_vertexs *
                                                    sizeof(t_tnode_descript));
 
     net_to_driver_tnode = (int*)my_malloc(num_nets * sizeof(int));
@@ -516,9 +513,9 @@ alloc_and_load_tnodes_and_net_mapping(int** num_uses_of_fb_ipin,
     num_subblocks_per_block = subblock_data.num_subblocks_per_block;
 
     /* allocate from_edges matrix*/
-    for (i = 0; i < num_tnodes; i++) {
-        tnode[i].num_parents = 0;
-        tnode[i].in_edges = (t_tedge*) my_malloc (6 * sizeof(t_tedge));
+    for (i = 0; i < num_of_vertexs; i++) {
+        vertexes[i].num_parents = 0;
+        vertexes[i].in_edges = (edge_t*)my_malloc(6 * sizeof(edge_t));
     }
 
     for (iblk = 0; iblk < num_blocks; iblk++) {
@@ -526,8 +523,7 @@ alloc_and_load_tnodes_and_net_mapping(int** num_uses_of_fb_ipin,
                         block_pin_to_tnode,
                         snode_block_pin_to_tnode[iblk],
                         num_subblocks_per_block[iblk], subblock_inf[iblk],
-                        block[iblk].type->type_timing_inf.
-                        T_fb_ipin_to_sblk_ipin);
+                        blocks[iblk].block_type->type_timing_inf.T_fb_ipin_to_sblk_ipin);
 
         build_subblock_tnodes(num_uses_of_sblk_opin[iblk],
                               block_pin_to_tnode[iblk],
@@ -555,51 +551,47 @@ build_fb_tnodes(int iblk,
      */
 
     int isub, ipin, iedge, from_pin, opin;
-    int inode, to_node, num_edges;
-    t_tedge* tedge;
+    int inode, to_node, num_out_edges;
+    edge_t* tedge;
 
-    block_type_ptr type = block[iblk].type;
+    block_type_ptr type = blocks[iblk].block_type;
     int* next_ipin_edge = (int*)my_malloc(type->num_pins * sizeof(int));
     int clk_pin = 0;
 
     /* Start by allocating the tedge arrays, and for opins, loading them.    */
 
-    for (ipin = 0; ipin < block[iblk].type->num_pins; ipin++) {
+    for (ipin = 0; ipin < blocks[iblk].block_type->num_pins; ipin++) {
         inode = block_pin_to_tnode[iblk][ipin];
 
         if (inode != OPEN) {
             /* Pin is used->put in graph */
-            if (is_opin(ipin, block[iblk].type)) {
+            if (is_opin(ipin, blocks[iblk].block_type)) {
                 build_block_output_tnode(inode, iblk, ipin,
                                          block_pin_to_tnode);
                 tnode_descript[inode].type = FB_OPIN;
             } else {
                 /* FB ipin */
                 next_ipin_edge[ipin] = 0;   /* Reset */
-                num_edges = n_uses_of_fb_ipin[ipin];
+                num_out_edges = n_uses_of_fb_ipin[ipin];
 
                 /* if clock pin, timing edges go to each subblock output used */
                 for (isub = 0; isub < num_subs; isub++) {
                     if (sub_inf[isub].clock == ipin) {
-                        for (opin = 0;
-                                opin <
-                                type->max_subblock_outputs;
-                                opin++) {
-                            if (sub_inf[isub].
-                                    outputs[opin] != OPEN) {
-                                num_edges++;
+                        for (opin = 0; opin < type->max_subblock_outputs; opin++) {
+                            if (sub_inf[isub].outputs[opin] != OPEN) {
+                                num_out_edges++;
                             }
                         }
 
-                        num_edges--;    /* Remove clock_pin count, replaced by outputs */
+                        num_out_edges--;    /* Remove clock_pin count, replaced by outputs */
                     }
                 }
 
-                tnode[inode].num_edges = num_edges;
+                vertexes[inode].num_out_edges = num_out_edges;
 
-                tnode[inode].out_edges =
-                    (t_tedge*) my_chunk_malloc(num_edges *
-                                               sizeof(t_tedge),
+                vertexes[inode].out_edges =
+                    (edge_t*) my_chunk_malloc(num_out_edges *
+                                               sizeof(edge_t),
                                                &tedge_ch_list_head,
                                                &tedge_ch_bytes_avail,
                                                &tedge_ch_next_avail);
@@ -623,11 +615,11 @@ build_fb_tnodes(int iblk,
             /* Not OPEN and comes from fb ipin? */
 
             if (from_pin != OPEN
-                    && from_pin < block[iblk].type->num_pins) {
+                    && from_pin < blocks[iblk].block_type->num_pins) {
                 inode = block_pin_to_tnode[iblk][from_pin];
                 assert(inode != OPEN);
                 to_node = sub_pin_to_tnode[isub][SUB_INPUT][ipin];
-                tedge = tnode[inode].out_edges;
+                tedge = vertexes[inode].out_edges;
                 iedge = next_ipin_edge[from_pin]++;
                 tedge[iedge].to_node = to_node;
                 tedge[iedge].Tdel = T_fb_ipin_to_sblk_ipin;
@@ -636,14 +628,14 @@ build_fb_tnodes(int iblk,
 
         from_pin = sub_inf[isub].clock;
 
-        if (from_pin != OPEN && from_pin < block[iblk].type->num_pins) {
+        if (from_pin != OPEN && from_pin < blocks[iblk].block_type->num_pins) {
             inode = block_pin_to_tnode[iblk][from_pin];
             to_node = sub_pin_to_tnode[isub][SUB_CLOCK][clk_pin];   /* Feeds seq. output */
 
             /* connect to each output flip flop */
             for (opin = 0; opin < type->max_subblock_outputs; opin++) {
                 if (sub_inf[isub].outputs[opin] != OPEN) {
-                    tedge = tnode[inode].out_edges;
+                    tedge = vertexes[inode].out_edges;
                     iedge = next_ipin_edge[from_pin]++;
                     tedge[iedge].to_node = to_node;
 
@@ -675,26 +667,26 @@ build_block_output_tnode(int inode,
 
     int iedge, to_blk, to_pin, to_node;
 
-    int inet = block[iblk].nets[ipin];  /* Won't be OPEN, as inode exists */
+    int inet = blocks[iblk].nets[ipin];  /* Won't be OPEN, as inode exists */
     assert(inet != OPEN);   /* Sanity check. */
 
     net_to_driver_tnode[inet] = inode;
 
-    int num_edges = (net[inet].num_net_pins + 1) - 1;
-    tnode[inode].num_edges = num_edges;
+    int num_out_edges = (net[inet].num_net_pins + 1) - 1;
+    vertexes[inode].num_out_edges = num_out_edges;
 
-    tnode[inode].out_edges = (t_tedge*) my_chunk_malloc(num_edges *
-                                                        sizeof(t_tedge),
+    vertexes[inode].out_edges = (edge_t*) my_chunk_malloc(num_out_edges *
+                                                        sizeof(edge_t),
                                                         &tedge_ch_list_head,
                                                         &tedge_ch_bytes_avail,
                                                         &tedge_ch_next_avail);
 
-    t_tedge* tedge = tnode[inode].out_edges;
+    edge_t* tedge = vertexes[inode].out_edges;
     const int knum_net_pins = net[inet].num_net_pins;
     for (iedge = 0; iedge < knum_net_pins; ++iedge) {
-        to_blk = net[inet].node_block[iedge + 1];
+        to_blk = net[inet].node_blocks[iedge + 1];
 
-        to_pin = net[inet].node_block_pin[iedge + 1];
+        to_pin = net[inet].node_block_pins[iedge + 1];
 
         to_node = block_pin_to_tnode[to_blk][to_pin];
         tedge[iedge].to_node = to_node;
@@ -718,13 +710,13 @@ static void build_subblock_tnodes(int** n_uses_of_sblk_opin,
         clk_pin, used_opin_count;
     int num_subs, from_sub;
     subblock_t* sub_inf;
-    int iedge, num_edges;
+    int iedge, num_out_edges;
     double sink_delay;
-    t_tedge* tedge;
+    edge_t* tedge;
     boolean has_inputs, has_outputs;
     int** next_sblk_opin_edge;  /* [0..max_subblocks-1][0..max_subblock_outputs-1] */
     int* num_opin_used_in_sblk; /* [0..max_subblocks-1] */
-    block_type_ptr type = block[iblk].type;
+    block_type_ptr type = blocks[iblk].block_type;
 
     sub_inf = subblock_inf[iblk];
     num_subs = num_subblocks_per_block[iblk];
@@ -748,25 +740,25 @@ static void build_subblock_tnodes(int** n_uses_of_sblk_opin,
                 /* Output is used->timing node exists. */
                 num_opin_used_in_sblk[isub]++;
                 next_sblk_opin_edge[isub][opin] = 0;    /* Reset */
-                num_edges = n_uses_of_sblk_opin[isub][opin];
-                tnode[inode].num_edges = num_edges;
+                num_out_edges = n_uses_of_sblk_opin[isub][opin];
+                vertexes[inode].num_out_edges = num_out_edges;
 
-                tnode[inode].out_edges =
-                    (t_tedge*) my_chunk_malloc(num_edges *
-                                               sizeof(t_tedge),
+                vertexes[inode].out_edges =
+                    (edge_t*) my_chunk_malloc(num_out_edges *
+                                               sizeof(edge_t),
                                                &tedge_ch_list_head,
                                                &tedge_ch_bytes_avail,
                                                &tedge_ch_next_avail);
 
                 if (IO_TYPE == type) {
                     tnode_descript[inode].type = INPAD_OPIN;
-                    tnode[inode + 1].num_edges = 1;
-                    tnode[inode + 1].out_edges = (t_tedge*)
-                                                 my_chunk_malloc(sizeof(t_tedge),
+                    vertexes[inode + 1].num_out_edges = 1;
+                    vertexes[inode + 1].out_edges = (edge_t*)
+                                                 my_chunk_malloc(sizeof(edge_t),
                                                                  &tedge_ch_list_head,
                                                                  &tedge_ch_bytes_avail,
                                                                  &tedge_ch_next_avail);
-                    tedge = tnode[inode + 1].out_edges;
+                    tedge = vertexes[inode + 1].out_edges;
                     tedge[0].to_node = inode;
 
                     /* For input pads, use sequential output for source timing Tdel (treat as register) */
@@ -775,12 +767,9 @@ static void build_subblock_tnodes(int** n_uses_of_sblk_opin,
                              subblock_inf)) {
                         tedge[0].Tdel = 0.;
                     } else
-                        tedge[0].Tdel =
-                            type->type_timing_inf.
-                            T_subblock[isub].T_seq_out[opin];
+                        tedge[0].Tdel = type->type_timing_inf.T_subblock[isub].T_seq_out[opin];
 
-                    tnode_descript[inode + 1].type =
-                        INPAD_SOURCE;
+                    tnode_descript[inode + 1].type = INPAD_SOURCE;
                     tnode_descript[inode + 1].ipin = OPEN;
                     tnode_descript[inode + 1].isubblk = isub;
                     tnode_descript[inode + 1].iblk = iblk;
@@ -821,9 +810,9 @@ static void build_subblock_tnodes(int** n_uses_of_sblk_opin,
             for (opin = 0; opin < type->max_subblock_outputs; opin++) {
                 if (sub_inf[isub].outputs[opin] != OPEN) {
                     /* First node is the clock input pin; it feeds the sequential output */
-                    tnode[inode].num_edges = 1;
-                    tnode[inode].out_edges = (t_tedge*)
-                                             my_chunk_malloc(sizeof(t_tedge),
+                    vertexes[inode].num_out_edges = 1;
+                    vertexes[inode].out_edges = (edge_t*)
+                                             my_chunk_malloc(sizeof(edge_t),
                                                              &tedge_ch_list_head,
                                                              &tedge_ch_bytes_avail,
                                                              &tedge_ch_next_avail);
@@ -836,8 +825,8 @@ static void build_subblock_tnodes(int** n_uses_of_sblk_opin,
                     /* Now create the "sequential sink" -- i.e. the FF input node. */
 
                     inode++;
-                    tnode[inode].num_edges = 0;
-                    tnode[inode].out_edges = NULL;
+                    vertexes[inode].num_out_edges = 0;
+                    vertexes[inode].out_edges = NULL;
 
                     tnode_descript[inode].type = FF_SINK;
                     tnode_descript[inode].ipin = OPEN;
@@ -854,48 +843,40 @@ static void build_subblock_tnodes(int** n_uses_of_sblk_opin,
             inode = sub_pin_to_tnode[isub][SUB_INPUT][ipin];
 
             if (inode != OPEN) {
-                /* tnode exists->pin is used */
+                /* vertexes exists->pin is used */
                 if (type == IO_TYPE) {
                     /* Output pad */
-                    tnode[inode].num_edges = 1;
+                    vertexes[inode].num_out_edges = 1;
                     opin = 0;
-                    tnode[inode].out_edges = (t_tedge*)
-                                             my_chunk_malloc(sizeof(t_tedge),
+                    vertexes[inode].out_edges = (edge_t*)
+                                             my_chunk_malloc(sizeof(edge_t),
                                                              &tedge_ch_list_head,
                                                              &tedge_ch_bytes_avail,
                                                              &tedge_ch_next_avail);
                     tnode_descript[inode].type = OUTPAD_IPIN;
-                    tnode[inode + 1].num_edges = 0;
-                    tnode[inode + 1].out_edges = NULL;
-                    tedge = tnode[inode].out_edges;
+                    vertexes[inode + 1].num_out_edges = 0;
+                    vertexes[inode + 1].out_edges = NULL;
+                    tedge = vertexes[inode].out_edges;
                     tedge[0].to_node = inode + 1;
 
                     /* For output pads, use subblock combinational time
                      * and sequential in for timing (treat as register) */
                     tedge[0].Tdel =
-                        type->type_timing_inf.
-                        T_subblock[isub].T_comb[ipin][opin] +
-                        type->type_timing_inf.
-                        T_subblock[isub].T_seq_in[opin];
+                        type->type_timing_inf.T_subblock[isub].T_comb[ipin][opin]
+                          + type->type_timing_inf.T_subblock[isub].T_seq_in[opin];
 
-                    tnode_descript[inode + 1].type =
-                        OUTPAD_SINK;
+                    tnode_descript[inode + 1].type = OUTPAD_SINK;
                     tnode_descript[inode + 1].ipin = OPEN;
                     tnode_descript[inode + 1].isubblk = isub;
                     tnode_descript[inode + 1].iblk = iblk;
                 } else {
-                    tnode[inode].num_edges =
-                        num_opin_used_in_sblk[isub];
-                    tnode[inode].out_edges =
-                        (t_tedge*)
-                        my_chunk_malloc(num_opin_used_in_sblk
-                                        [isub] *
-                                        sizeof(t_tedge),
-                                        &tedge_ch_list_head,
-                                        &tedge_ch_bytes_avail,
-                                        &tedge_ch_next_avail);
-                    tnode[inode].num_edges =
-                        num_opin_used_in_sblk[isub];
+                    vertexes[inode].num_out_edges = num_opin_used_in_sblk[isub];
+                    vertexes[inode].out_edges =
+                        (edge_t*)my_chunk_malloc(num_opin_used_in_sblk[isub] * sizeof(edge_t),
+                                                 &tedge_ch_list_head,
+                                                 &tedge_ch_bytes_avail,
+                                                 &tedge_ch_next_avail);
+                    vertexes[inode].num_out_edges = num_opin_used_in_sblk[isub];
                     tnode_descript[inode].type = SUBBLK_IPIN;
                 }
 
@@ -929,26 +910,18 @@ static void build_subblock_tnodes(int** n_uses_of_sblk_opin,
                      * Internal connections are numbered subblock_index + subblock_output_index + num_pins
                      */
                     from_sub =
-                        (from_pin -
-                         type->num_pins) /
-                        type->max_subblock_outputs;
+                        (from_pin - type->num_pins) / type->max_subblock_outputs;
                     from_opin =
-                        (from_pin -
-                         type->num_pins) %
-                        type->max_subblock_outputs;
+                        (from_pin - type->num_pins) % type->max_subblock_outputs;
                     inode =
-                        sub_pin_to_tnode[from_sub][SUB_OUTPUT]
-                        [from_opin];
+                        sub_pin_to_tnode[from_sub][SUB_OUTPUT][from_opin];
                     to_node =
-                        sub_pin_to_tnode[isub][SUB_INPUT]
-                        [ipin];
-                    tedge = tnode[inode].out_edges;
-                    iedge = next_sblk_opin_edge[from_sub]
-                            [from_opin]++;
+                        sub_pin_to_tnode[isub][SUB_INPUT][ipin];
+                    tedge = vertexes[inode].out_edges;
+                    iedge = next_sblk_opin_edge[from_sub][from_opin]++;
                     tedge[iedge].to_node = to_node;
                     tedge[iedge].Tdel =
-                        type->type_timing_inf.
-                        T_sblk_opin_to_sblk_ipin;
+                        type->type_timing_inf.T_sblk_opin_to_sblk_ipin;
                 }
             }
 
@@ -958,20 +931,16 @@ static void build_subblock_tnodes(int** n_uses_of_sblk_opin,
 
             if (from_pin >= type->num_pins) {
                 from_sub =
-                    (from_pin -
-                     type->num_pins) / type->max_subblock_outputs;
+                    (from_pin - type->num_pins) / type->max_subblock_outputs;
                 from_opin =
-                    (from_pin -
-                     type->num_pins) % type->max_subblock_outputs;
-                inode = sub_pin_to_tnode[from_sub][SUB_OUTPUT]
-                        [from_opin];
+                    (from_pin - type->num_pins) % type->max_subblock_outputs;
+                inode = sub_pin_to_tnode[from_sub][SUB_OUTPUT][from_opin];
                 /* Feeds seq. output, one ff per output pin */
                 to_node =
                     sub_pin_to_tnode[isub][SUB_CLOCK][clk_pin] +
                     2 * used_opin_count;
-                tedge = tnode[inode].out_edges;
-                iedge =
-                    next_sblk_opin_edge[from_sub][from_opin]++;
+                tedge = vertexes[inode].out_edges;
+                iedge = next_sblk_opin_edge[from_sub][from_opin]++;
                 tedge[iedge].to_node = to_node;
 
                 /* NB: Could make sblk opin to clk Tdel parameter; not worth it right now. */
@@ -981,23 +950,20 @@ static void build_subblock_tnodes(int** n_uses_of_sblk_opin,
             }
 
             to_pin = sub_inf[isub].outputs[opin];
-
             if (to_pin != OPEN) {
                 /* sblk opin goes to fb opin? */
 
                 /* Check that FB pin connects to something->    *
                  * not just a mandatory BLE to FB opin connection */
-
-                if (block[iblk].nets[to_pin] != OPEN) {
+                if (blocks[iblk].nets[to_pin] != OPEN) {
                     to_node = node_block_pin_to_tnode[to_pin];
                     inode = sub_pin_to_tnode[isub][SUB_OUTPUT]
                             [opin];
-                    tedge = tnode[inode].out_edges;
+                    tedge = vertexes[inode].out_edges;
                     iedge = next_sblk_opin_edge[isub][opin]++;
                     tedge[iedge].to_node = to_node;
                     tedge[iedge].Tdel =
-                        type->type_timing_inf.
-                        T_sblk_opin_to_fb_opin;
+                        type->type_timing_inf.T_sblk_opin_to_fb_opin;
                 }
             }
 
@@ -1029,7 +995,7 @@ static void build_subblock_tnodes(int** n_uses_of_sblk_opin,
                     2 * used_opin_count;
 
                 /* First node is the clock input pin; it feeds the sequential output */
-                tedge = tnode[inode].out_edges;
+                tedge = vertexes[inode].out_edges;
                 tedge[0].to_node =
                     sub_pin_to_tnode[isub][SUB_OUTPUT][opin];
                 tedge[0].Tdel =
@@ -1053,9 +1019,9 @@ static void build_subblock_tnodes(int** n_uses_of_sblk_opin,
                 inode = sub_pin_to_tnode[isub][SUB_INPUT][ipin];
 
                 if (inode != OPEN) {
-                    /* tnode exists->pin is used */
+                    /* vertexes exists->pin is used */
                     has_inputs = TRUE;
-                    tedge = tnode[inode].out_edges;
+                    tedge = vertexes[inode].out_edges;
                     tedge[used_opin_count].to_node = to_node;
                     tedge[used_opin_count].Tdel =
                         sink_delay +
@@ -1069,13 +1035,13 @@ static void build_subblock_tnodes(int** n_uses_of_sblk_opin,
 
                 inode =
                     sub_pin_to_tnode[isub][SUB_OUTPUT][opin] + 1;
-                tnode[inode].num_edges = 1;
-                tnode[inode].out_edges =
-                    (t_tedge*) my_chunk_malloc(sizeof(t_tedge),
+                vertexes[inode].num_out_edges = 1;
+                vertexes[inode].out_edges =
+                    (edge_t*) my_chunk_malloc(sizeof(edge_t),
                                                &tedge_ch_list_head,
                                                &tedge_ch_bytes_avail,
                                                &tedge_ch_next_avail);
-                tedge = tnode[inode].out_edges;
+                tedge = vertexes[inode].out_edges;
                 tedge[used_opin_count].to_node = to_node;
 
                 /* Want constants generated early so they never affect the critical path. */
@@ -1107,10 +1073,10 @@ static boolean is_global_clock(int iblk,
     /* Returns TRUE if the net driven by this block (which must be an INPAD) is  *
        (1) a global signal, and (2) used as a clock input to at least one block.
        Assumes that there is only one subblock in an IO */
-    block_type_ptr type = block[iblk].type;
+    block_type_ptr type = blocks[iblk].block_type;
     assert(type == IO_TYPE);
 
-    int inet = block[iblk].nets[subblock_inf[iblk][sub].outputs[subpin]];
+    int inet = blocks[iblk].nets[subblock_inf[iblk][sub].outputs[subpin]];
     assert(inet != OPEN);
     if (!net[inet].is_global) {
         return FALSE;
@@ -1119,8 +1085,8 @@ static boolean is_global_clock(int iblk,
     int  ipin = 0;
     const int knum_net_pins = net[inet].num_net_pins;
     for (ipin = 1; ipin < knum_net_pins + 1; ++ipin) {
-        int to_blk = net[inet].node_block[ipin];
-        int to_pin = net[inet].node_block_pin[ipin];
+        int to_blk = net[inet].node_blocks[ipin];
+        int to_pin = net[inet].node_block_pins[ipin];
         int isub = -1;
         for (isub = 0; isub < num_subblocks_per_block[to_blk]; ++isub) {
             if (subblock_inf[to_blk][isub].clock == to_pin) {
@@ -1144,11 +1110,11 @@ unsigned long load_timing_graph_net_delays_parallel(double** net_delay,
     int inet = 0;
     for (inet = start_net; inet < finish_net; ++inet) {
         int inode = net_to_driver_tnode[inet];
-        t_tedge* tedge = tnode[inode].out_edges;
+        edge_t* tedge = vertexes[inode].out_edges;
         sinks += (long)net[inet].num_net_pins;
 
-        /* Note that the edges of a tnode corresponding to a FB or INPAD opin must*
-         * be in the same order as the pins of the net driven by the tnode.       */
+        /* Note that the edges of a vertexes corresponding to a FB or INPAD opin must*
+         * be in the same order as the pins of the net driven by the vertexes.       */
         int ipin = 0;
         const int knum_net_pins = net[inet].num_net_pins;
         for (ipin = 1; ipin < knum_net_pins + 1; ++ipin) {
@@ -1156,16 +1122,16 @@ unsigned long load_timing_graph_net_delays_parallel(double** net_delay,
             int to_node = tedge[ipin - 1].to_node;
 
             int counter = -1;
-            for (counter = 0; counter < tnode[to_node].num_parents; ++counter) {
-                if (tnode[to_node].in_edges[counter].to_node != inode) {
+            for (counter = 0; counter < vertexes[to_node].num_parents; ++counter) {
+                if (vertexes[to_node].in_edges[counter].to_node != inode) {
                     continue;
                 }
 
-                tnode[to_node].in_edges[counter].Tdel = net_delay[inet][ipin];
+                vertexes[to_node].in_edges[counter].Tdel = net_delay[inet][ipin];
                 break;
             }
 
-            if (counter == tnode[to_node].num_parents) {
+            if (counter == vertexes[to_node].num_parents) {
                 printf("disrepency between fanout and fanin nodes\n");
                 exit(-1);
             }
@@ -1184,14 +1150,14 @@ void load_timing_graph_net_delays(double** net_delay)
      * marks the corresponding edges in the timing graph with the proper Tdel.  */
 
     int inet, ipin, inode;
-    t_tedge* tedge;
+    edge_t* tedge;
 
     for (inet = 0; inet < num_nets; inet++) {
         inode = net_to_driver_tnode[inet];
-        tedge = tnode[inode].out_edges;
+        tedge = vertexes[inode].out_edges;
 
-        /* Note that the edges of a tnode corresponding to a FB or INPAD opin must  *
-         * be in the same order as the pins of the net driven by the tnode.          */
+        /* Note that the edges of a vertexes corresponding to a FB or INPAD opin must  *
+         * be in the same order as the pins of the net driven by the vertexes.          */
         const int knum_net_pins = net[inet].num_net_pins;
         for (ipin = 1; ipin < knum_net_pins + 1; ++ipin) {
             tedge[ipin - 1].Tdel = net_delay[inet][ipin];
@@ -1211,7 +1177,7 @@ void free_timing_graph(double** net_slack)
     }
 
     free_chunk_memory(tedge_ch_list_head);
-    free(tnode);
+    free(vertexes);
     free(tnode_descript);
     free(net_to_driver_tnode);
     free_ivec_vector(tnodes_at_level, 0, num_tnode_levels - 1);
@@ -1221,9 +1187,9 @@ void free_timing_graph(double** net_slack)
     tedge_ch_bytes_avail = 0;
     tedge_ch_next_avail = NULL;
 
-    tnode = NULL;
+    vertexes = NULL;
     tnode_descript = NULL;
-    num_tnodes = 0;
+    num_of_vertexs = 0;
     net_to_driver_tnode = NULL;
     tnodes_at_level = NULL;
     num_tnode_levels = 0;
@@ -1258,7 +1224,7 @@ void print_timing_graph(char* fname)
 
     FILE* fp;
     int inode, iedge, ilevel, i;
-    t_tedge* tedge;
+    edge_t* tedge;
     t_tnode_type itype;
     char* tnode_type_names[] = { "INPAD_SOURCE", "INPAD_OPIN",
                                  "OUTPAD_IPIN", "OUTPAD_SINK", "FB_IPIN", "FB_OPIN",
@@ -1269,11 +1235,11 @@ void print_timing_graph(char* fname)
 
     fp = my_fopen(fname, "w");
 
-    fprintf(fp, "num_tnodes: %d\n", num_tnodes);
+    fprintf(fp, "num_of_vertexs: %d\n", num_of_vertexs);
     fprintf(fp, "Node #\tType\t\tipin\tisubblk\tiblk\t# edges\t"
             "Edges (to_node, Tdel)\n\n");
 
-    for (inode = 0; inode < num_tnodes; inode++) {
+    for (inode = 0; inode < num_of_vertexs; inode++) {
         fprintf(fp, "%d\t", inode);
 
         itype = tnode_descript[inode].type;
@@ -1283,10 +1249,10 @@ void print_timing_graph(char* fname)
                 tnode_descript[inode].isubblk,
                 tnode_descript[inode].iblk);
 
-        fprintf(fp, "%d\t", tnode[inode].num_edges);
-        tedge = tnode[inode].out_edges;
+        fprintf(fp, "%d\t", vertexes[inode].num_out_edges);
+        tedge = vertexes[inode].out_edges;
 
-        for (iedge = 0; iedge < tnode[inode].num_edges; iedge++) {
+        for (iedge = 0; iedge < vertexes[inode].num_out_edges; iedge++) {
             fprintf(fp, "\t(%4d,%7.3g)", tedge[iedge].to_node,
                     tedge[iedge].Tdel);
         }
@@ -1314,9 +1280,9 @@ void print_timing_graph(char* fname)
 
     fprintf(fp, "\n\nNode #\t\tT_arr\t\tT_req\n\n");
 
-    for (inode = 0; inode < num_tnodes; inode++)
-        fprintf(fp, "%d\t%12g\t%12g\n", inode, tnode[inode].arr_time,
-                tnode[inode].req_time);
+    for (inode = 0; inode < num_of_vertexs; inode++)
+        fprintf(fp, "%d\t%12g\t%12g\n", inode, vertexes[inode].arr_time,
+                vertexes[inode].req_time);
 
     fclose(fp);
 }
@@ -1339,18 +1305,19 @@ double calc_tnodes_arr_time_parallel(int start_node,
     int i = 0;
     for (i = start_node; i < finish_node; ++i) {
         int inode = tnodes_at_level[ilevel].list[i];
-        int num_edges = tnode[inode].num_parents;
-        t_tedge* tedge = tnode[inode].in_edges;
+        int num_out_edges = vertexes[inode].num_parents;
+        edge_t* tedge = vertexes[inode].in_edges;
 
         int iedge = -1;
-        for (iedge = 0; iedge < num_edges; ++iedge) {
+        for (iedge = 0; iedge < num_out_edges; ++iedge) {
             int   from_node = tedge[iedge].to_node;
-            double arr_time = tnode[from_node].arr_time;
+            double arr_time = vertexes[from_node].arr_time;
             double Tdel = tedge[iedge].Tdel;
-            tnode[inode].arr_time = max(tnode[inode].arr_time, arr_time + Tdel);
+            vertexes[inode].arr_time = max(vertexes[inode].arr_time,
+                                           arr_time + Tdel);
         }
 
-        T_crit = max(T_crit, tnode[inode].arr_time);
+        T_crit = max(T_crit, vertexes[inode].arr_time);
     }
 
     return T_crit;
@@ -1372,23 +1339,23 @@ void calc_tnodes_req_time_parallel(double T_cycle,
     for (i = start_node; i < finish_node; ++i) {
         int inode = tnodes_at_level[ilevel].list[i];
 
-        int num_edges = tnode[inode].num_edges;
-        if (num_edges == 0) {
+        int num_out_edges = vertexes[inode].num_out_edges;
+        if (num_out_edges == 0) {
             /* this node was in last level. It's a sink node. */
-            tnode[inode].req_time = T_cycle;
+            vertexes[inode].req_time = T_cycle;
         } else {
-            t_tedge* tedge = tnode[inode].out_edges;
+            edge_t* tedge = vertexes[inode].out_edges;
             int    to_node = tedge[0].to_node;
             double  Tdel = tedge[0].Tdel;
-            double  req_time = tnode[to_node].req_time - Tdel;
+            double  req_time = vertexes[to_node].req_time - Tdel;
 
             int iedge = 0;
-            for (iedge = 1; iedge < num_edges; ++iedge) {
+            for (iedge = 1; iedge < num_out_edges; ++iedge) {
                 to_node = tedge[iedge].to_node;
                 Tdel = tedge[iedge].Tdel;
-                req_time = min(req_time, tnode[to_node].req_time - Tdel);
+                req_time = min(req_time, vertexes[to_node].req_time - Tdel);
             }
-            tnode[inode].req_time = req_time;
+            vertexes[inode].req_time = req_time;
         }
     }  /* end of for (i = start_node; i < finish_node; ++i) */
 }  /* end of void calc_tnodes_req_time_parallel(double** net_slack,..) */
@@ -1402,15 +1369,15 @@ double load_net_slack(double** net_slack,
                      double target_cycle_time)
 {
     double T_crit, arr_time, Tdel, T_cycle, req_time;
-    int inode, ilevel, num_at_level, i, num_edges, iedge, to_node;
-    t_tedge* tedge;
+    int inode, ilevel, num_at_level, i, num_out_edges, iedge, to_node;
+    edge_t* tedge;
 
     /* Reset all arrival times to -ve infinity.  Can't just set to zero or the   *
      * constant propagation (constant generators work at -ve infinity) won't     *
      * work.                                                                     */
 
-    for (inode = 0; inode < num_tnodes; inode++) {
-        tnode[inode].arr_time = T_CONSTANT_GENERATOR;
+    for (inode = 0; inode < num_of_vertexs; inode++) {
+        vertexes[inode].arr_time = T_CONSTANT_GENERATOR;
     }
 
     /* Compute all arrival times with a breadth-first analysis from inputs to   *
@@ -1424,7 +1391,7 @@ double load_net_slack(double** net_slack,
 
     for (i = 0; i < num_at_level; i++) {
         inode = tnodes_at_level[0].list[i];
-        tnode[inode].arr_time = 0.;
+        vertexes[inode].arr_time = 0.;
     }
 
     for (ilevel = 0; ilevel < num_tnode_levels; ilevel++) {
@@ -1432,16 +1399,16 @@ double load_net_slack(double** net_slack,
 
         for (i = 0; i < num_at_level; i++) {
             inode = tnodes_at_level[ilevel].list[i];
-            arr_time = tnode[inode].arr_time;
-            num_edges = tnode[inode].num_edges;
-            tedge = tnode[inode].out_edges;
+            arr_time = vertexes[inode].arr_time;
+            num_out_edges = vertexes[inode].num_out_edges;
+            tedge = vertexes[inode].out_edges;
             T_crit = max(T_crit, arr_time);
 
-            for (iedge = 0; iedge < num_edges; iedge++) {
+            for (iedge = 0; iedge < num_out_edges; iedge++) {
                 to_node = tedge[iedge].to_node;
                 Tdel = tedge[iedge].Tdel;
-                tnode[to_node].arr_time =
-                    max(tnode[to_node].arr_time, arr_time + Tdel);
+                vertexes[to_node].arr_time =
+                    max(vertexes[to_node].arr_time, arr_time + Tdel);
             }
         }
 
@@ -1461,26 +1428,26 @@ double load_net_slack(double** net_slack,
 
         for (i = 0; i < num_at_level; i++) {
             inode = tnodes_at_level[ilevel].list[i];
-            num_edges = tnode[inode].num_edges;
+            num_out_edges = vertexes[inode].num_out_edges;
 
-            if (num_edges == 0) {
+            if (num_out_edges == 0) {
                 /* sink */
-                tnode[inode].req_time = T_cycle;
+                vertexes[inode].req_time = T_cycle;
             } else {
-                tedge = tnode[inode].out_edges;
+                tedge = vertexes[inode].out_edges;
                 to_node = tedge[0].to_node;
                 Tdel = tedge[0].Tdel;
-                req_time = tnode[to_node].req_time - Tdel;
+                req_time = vertexes[to_node].req_time - Tdel;
 
-                for (iedge = 1; iedge < num_edges; iedge++) {
+                for (iedge = 1; iedge < num_out_edges; iedge++) {
                     to_node = tedge[iedge].to_node;
                     Tdel = tedge[iedge].Tdel;
                     req_time =
                         min(req_time,
-                            tnode[to_node].req_time - Tdel);
+                            vertexes[to_node].req_time - Tdel);
                 }
 
-                tnode[inode].req_time = req_time;
+                vertexes[inode].req_time = req_time;
             }
         }
     }
@@ -1502,17 +1469,17 @@ unsigned long compute_net_slacks_parallel(double** net_slack,
     int inet = 0;
     for (inet = start_net; inet < finish_net; ++inet) {
         const int driver_node = net_to_driver_tnode[inet];
-        const double arr_time = tnode[driver_node].arr_time;
-        t_tedge* tedge = tnode[driver_node].out_edges;
+        const double arr_time = vertexes[driver_node].arr_time;
+        edge_t* tedge = vertexes[driver_node].out_edges;
 
-        const int num_edges = tnode[driver_node].num_edges;
-        count_work += (unsigned long int)num_edges;
+        const int num_out_edges = vertexes[driver_node].num_out_edges;
+        count_work += (unsigned long int)num_out_edges;
 
         int iedge = -1;
-        for (iedge = 0; iedge < num_edges; ++iedge) {
+        for (iedge = 0; iedge < num_out_edges; ++iedge) {
             const int to_node = tedge[iedge].to_node;
             const double Tdel = tedge[iedge].Tdel;
-            const double req_time = tnode[to_node].req_time;
+            const double req_time = vertexes[to_node].req_time;
             net_slack[inet][iedge + 1] = req_time - arr_time - Tdel;
         }  /* compute a few nets' slack OK! */
     }
@@ -1523,20 +1490,20 @@ unsigned long compute_net_slacks_parallel(double** net_slack,
 static void compute_net_slacks(double** net_slack)
 {
     /* Puts the slack of each source-sink pair of block pins in net_slack. */
-    int inet, iedge, inode, to_node, num_edges;
-    t_tedge* tedge;
+    int inet, iedge, inode, to_node, num_out_edges;
+    edge_t* tedge;
     double arr_time, Tdel, req_time;
 
     for (inet = 0; inet < num_nets; inet++) {
         inode = net_to_driver_tnode[inet];
-        arr_time = tnode[inode].arr_time;
-        num_edges = tnode[inode].num_edges;
-        tedge = tnode[inode].out_edges;
+        arr_time = vertexes[inode].arr_time;
+        num_out_edges = vertexes[inode].num_out_edges;
+        tedge = vertexes[inode].out_edges;
 
-        for (iedge = 0; iedge < num_edges; iedge++) {
+        for (iedge = 0; iedge < num_out_edges; iedge++) {
             to_node = tedge[iedge].to_node;
             Tdel = tedge[iedge].Tdel;
-            req_time = tnode[to_node].req_time;
+            req_time = vertexes[to_node].req_time;
             net_slack[inet][iedge + 1] = req_time - arr_time - Tdel;
         }
     }
@@ -1619,9 +1586,9 @@ allocate_and_load_critical_path(void)
      * path in a linked list, from the path SOURCE to the path SINK.            */
 
     t_linked_int* critical_path_head, *curr_crit_node, *prev_crit_node;
-    int inode, iedge, to_node, num_at_level, i, crit_node, num_edges;
+    int inode, iedge, to_node, num_at_level, i, crit_node, num_out_edges;
     double min_slack, slack;
-    t_tedge* tedge;
+    edge_t* tedge;
 
     num_at_level = tnodes_at_level[0].nelem;
     min_slack = HUGE_FLOAT;
@@ -1630,7 +1597,7 @@ allocate_and_load_critical_path(void)
     for (i = 0; i < num_at_level; i++) {
         /* Path must start at SOURCE (no inputs) */
         inode = tnodes_at_level[0].list[i];
-        slack = tnode[inode].req_time - tnode[inode].arr_time;
+        slack = vertexes[inode].req_time - vertexes[inode].arr_time;
 
         if (slack < min_slack) {
             crit_node = inode;
@@ -1641,18 +1608,18 @@ allocate_and_load_critical_path(void)
     critical_path_head = (t_linked_int*) my_malloc(sizeof(t_linked_int));
     critical_path_head->data = crit_node;
     prev_crit_node = critical_path_head;
-    num_edges = tnode[crit_node].num_edges;
+    num_out_edges = vertexes[crit_node].num_out_edges;
 
-    while (num_edges != 0) {
+    while (num_out_edges != 0) {
         /* Path will end at SINK (no fanout) */
         curr_crit_node = (t_linked_int*) my_malloc(sizeof(t_linked_int));
         prev_crit_node->next = curr_crit_node;
-        tedge = tnode[crit_node].out_edges;
+        tedge = vertexes[crit_node].out_edges;
         min_slack = HUGE_FLOAT;
 
-        for (iedge = 0; iedge < num_edges; iedge++) {
+        for (iedge = 0; iedge < num_out_edges; iedge++) {
             to_node = tedge[iedge].to_node;
-            slack = tnode[to_node].req_time - tnode[to_node].arr_time;
+            slack = vertexes[to_node].req_time - vertexes[to_node].arr_time;
 
             if (slack < min_slack) {
                 crit_node = to_node;
@@ -1662,7 +1629,7 @@ allocate_and_load_critical_path(void)
 
         curr_crit_node->data = crit_node;
         prev_crit_node = curr_crit_node;
-        num_edges = tnode[crit_node].num_edges;
+        num_out_edges = vertexes[crit_node].num_out_edges;
     }
 
     prev_crit_node->next = NULL;
@@ -1676,7 +1643,7 @@ get_tnode_block_and_output_net(int inode,
                                int* inet_ptr)
 {
 
-    /* Returns the index of the block that this tnode is part of.  If the tnode *
+    /* Returns the index of the block that this vertexes is part of.  If the vertexes *
      * is a FB_OPIN or INPAD_OPIN (i.e. if it drives a net), the net index is  *
      * returned via inet_ptr.  Otherwise inet_ptr points at OPEN.               */
 
@@ -1688,7 +1655,7 @@ get_tnode_block_and_output_net(int inode,
 
     if (tnode_type == FB_OPIN || tnode_type == INPAD_OPIN) {
         ipin = tnode_descript[inode].ipin;
-        inet = block[iblk].nets[ipin];
+        inet = blocks[iblk].nets[ipin];
     } else {
         inet = OPEN;
     }

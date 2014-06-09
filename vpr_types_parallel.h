@@ -94,8 +94,8 @@ typedef enum e_pad_loc_type {
 typedef struct s_net {
     char* name;
     int  num_net_pins;
-    int* node_block;
-    int* node_block_pin;
+    int* node_blocks;
+    int* node_block_pins;
     boolean is_global;
 } net_t;
 
@@ -230,7 +230,7 @@ typedef const type_descriptor_t* block_type_ptr;
  * z:    Multiple independant locations within a physical location,
          index to the blocks[] in s_grid_tile */
 typedef struct s_block {
-    block_type_ptr type;
+    block_type_ptr block_type;
     char* name;
     int*  nets;
     int   x;
@@ -246,10 +246,10 @@ typedef struct s_block {
  * blocks[]: Array of logical blocks placed in a physical position, EMPTY means
              no block at that index */
 typedef struct s_grid_tile {
-    block_type_ptr type;
-    int        offset;
-    int        usage;
-    int*       blocks;
+    block_type_ptr  grid_type;
+    int        m_offset;
+    int        m_usage;
+    int*       in_blocks;
 } grid_tile_t;
 
 /* Stores the bounding box of a net in terms of the minimum and  *

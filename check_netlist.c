@@ -132,10 +132,10 @@ check_connections_to_global_fb_pins(int inet)
      * output pin type to allow people to make architectures that didn't have     *
      * this warning.                                                              */
     for (ipin = 0; ipin < knum_net_pins; ++ipin) {
-        iblk = net[inet].node_block[ipin];
-        node_block_pin = net[inet].node_block_pin[ipin];
+        iblk = net[inet].node_blocks[ipin];
+        node_block_pin = net[inet].node_block_pins[ipin];
 
-        if (block[iblk].type->is_global_pin[node_block_pin] !=
+        if (blocks[iblk].block_type->is_global_pin[node_block_pin] !=
                 net[inet].is_global) {
             /* Allow a FB output pin to drive a global net (warning only). */
             if (ipin == 0 && net[inet].is_global) {
@@ -144,7 +144,7 @@ check_connections_to_global_fb_pins(int inet)
                  "\tnet #%d (%s) is driven by FB output pin (#%d)\n"
                  "\ton block #%d (%s).\n", inet,
                  net[inet].name, node_block_pin, iblk,
-                 block[iblk].name);
+                 blocks[iblk].name);
             } else {
                 /* Otherwise->Error */
                 printf
@@ -152,7 +152,7 @@ check_connections_to_global_fb_pins(int inet)
                  "\tpin %d on net #%d (%s) connects to FB input pin (#%d)\n"
                  "\ton block #%d (%s).\n", ipin, inet,
                  net[inet].name, node_block_pin, iblk,
-                 block[iblk].name);
+                 blocks[iblk].name);
                 error++;
             }
 
@@ -173,20 +173,19 @@ check_fb_conn(int iblk,
               int num_conn)
 {
     /* Checks that the connections into and out of the fb make sense.  */
-    int iclass, ipin, error;
-    block_type_ptr type;
-    error = 0;
-    type = block[iblk].type;
+    int iclass, ipin;
 
+    int error = 0;
+    block_type_ptr type = blocks[iblk].block_type;
     if (type == IO_TYPE) {
         if (num_conn != 1) {
             printf(ERRTAG "io blk #%d (%s) has %d pins.\n",
-                   iblk, block[iblk].name, num_conn);
+                   iblk, blocks[iblk].name, num_conn);
             error++;
         }
     } else if (num_conn < 2) {
         printf("Warning:  logic block #%d (%s) has only %d pin.\n",
-               iblk, block[iblk].name, num_conn);
+               iblk, blocks[iblk].name, num_conn);
 
         /* Allow the case where we have only one OUTPUT pin connected to continue. *
          * This is used sometimes as a constant generator for a primary output,    *
@@ -195,7 +194,7 @@ check_fb_conn(int iblk,
 
         if (num_conn == 1) {
             for (ipin = 0; ipin < type->num_pins; ipin++) {
-                if (block[iblk].nets[ipin] != OPEN) {
+                if (blocks[iblk].nets[ipin] != OPEN) {
                     iclass = type->pin_class[ipin];
 
                     if (type->class_inf[iclass].type != DRIVER) {
@@ -219,7 +218,7 @@ check_fb_conn(int iblk,
 
     if (num_conn > type->num_pins) {
         printf("Error:  logic block #%d with output %s has %d pins.\n",
-               iblk, block[iblk].name, num_conn);
+               iblk, blocks[iblk].name, num_conn);
         error++;
     }
 
@@ -239,8 +238,7 @@ check_for_duplicate_block_names(void)
     block_hash_table = alloc_hash_table();
 
     for (iblk = 0; iblk < num_blocks; iblk++)
-        h_ptr =
-            insert_in_hash_table(block_hash_table, block[iblk].name, iblk);
+        h_ptr = insert_in_hash_table(block_hash_table, blocks[iblk].name, iblk);
 
     hash_iterator = start_hash_table_iterator();
     h_ptr = get_next_hash(block_hash_table, &hash_iterator);
@@ -268,22 +266,19 @@ check_subblocks(int iblk,
                 int** num_uses_of_sblk_opin)
 {
     /* This routine checks the subblocks of iblk (which must be a FB).  It    *
-     * returns the number of errors found.                                     */
-    int error, isub, ipin, fb_pin, num_pins_fb;
-    int num_subblocks, max_subblocks_per_block, subblock_lut_size,
-        num_outputs;
-    subblock_t* subblock_inf;
-    num_pins_fb = block[iblk].type->num_pins;
-    error = 0;
-    subblock_inf = subblock_data_ptr->subblock_inf[iblk];
-    num_subblocks = subblock_data_ptr->num_subblocks_per_block[iblk];
-    max_subblocks_per_block = block[iblk].type->max_subblocks;
-    subblock_lut_size = block[iblk].type->max_subblock_inputs;
-    num_outputs = block[iblk].type->max_subblock_outputs;
+     * returns the number of errors found.                                    */
+    int isub, ipin, fb_pin;
+    int num_pins_fb = blocks[iblk].block_type->num_pins;
+    int error = 0;
+    subblock_t* subblock_inf = subblock_data_ptr->subblock_inf[iblk];
+    int num_subblocks = subblock_data_ptr->num_subblocks_per_block[iblk];
+    int max_subblocks_per_block = blocks[iblk].block_type->max_subblocks;
+    int subblock_lut_size = blocks[iblk].block_type->max_subblock_inputs;
+    int num_outputs = blocks[iblk].block_type->max_subblock_outputs;
 
     if (num_subblocks < 1 || num_subblocks > max_subblocks_per_block) {
         printf("Error:  block #%d (%s) contains %d subblocks.\n",
-               iblk, block[iblk].name, num_subblocks);
+               iblk, blocks[iblk].name, num_subblocks);
         error++;
     }
 
@@ -347,14 +342,13 @@ check_subblock_pin(int fb_pin,
     /* Checks that this subblock pin connects to a valid clb pin or BLE output *
      * within the clb.  Returns the number of errors found.                    */
     int iclass;
-    block_type_ptr type;
-    type = block[iblk].type;
+    block_type_ptr type = blocks[iblk].block_type;
 
     if (fb_pin != OPEN) {
         if (fb_pin < min_val || fb_pin > max_val) {
             printf("Error:  Block #%d (%s) subblock #%d (%s)"
                    "connects to nonexistent clb pin #%d.\n", iblk,
-                   block[iblk].name, isubblk,
+                   blocks[iblk].name, isubblk,
                    subblock_inf[isubblk].name, fb_pin);
             return (1);
         }
@@ -367,7 +361,7 @@ check_subblock_pin(int fb_pin,
                 printf
                 ("Error:  Block #%d (%s) subblock #%d (%s) pin connects\n"
                  "\tto clb pin (#%d) of wrong input/output type.\n",
-                 iblk, block[iblk].name, isubblk,
+                 iblk, blocks[iblk].name, isubblk,
                  subblock_inf[isubblk].name, fb_pin);
                 return (1);
             }
@@ -378,23 +372,21 @@ check_subblock_pin(int fb_pin,
 }
 
 
-static void
-check_for_multiple_sink_connections(void)
+static void check_for_multiple_sink_connections(void)
 {
     /* The check is for nets that connect more than once to the same class of  *
      * pins on the same block.  For LUTs and cluster-based logic blocks that   *
      * doesn't make sense, although for some logic blocks it does.  The router *
      * can now handle this case, so maybe I should get rid of this check.      */
     int iblk, ipin, inet, iclass, class_pin;
-    int* num_pins_connected;
     block_type_ptr type;
-    num_pins_connected = my_calloc(num_nets, sizeof(int));
+    int* num_pins_connected = (int*)my_calloc(num_nets, sizeof(int));
 
     /* Have to do the check block by block, rather than net by net, for speed. *
      * This makes the code a bit messy.                                        */
 
     for (iblk = 0; iblk < num_blocks; iblk++) {
-        type = block[iblk].type;
+        type = blocks[iblk].block_type;
 
         for (iclass = 0; iclass < type->num_class; iclass++) {
             /* Two DRIVER pins can never connect to the same net (already checked by    *
@@ -407,7 +399,7 @@ check_for_multiple_sink_connections(void)
                     class_pin < type->class_inf[iclass].num_pins;
                     class_pin++) {
                 ipin = type->class_inf[iclass].pinlist[class_pin];
-                inet = block[iblk].nets[ipin];
+                inet = blocks[iblk].nets[ipin];
 
                 if (inet != OPEN) {
                     num_pins_connected[inet]++;
@@ -418,14 +410,13 @@ check_for_multiple_sink_connections(void)
                     class_pin < type->class_inf[iclass].num_pins;
                     class_pin++) {
                 ipin = type->class_inf[iclass].pinlist[class_pin];
-                inet = block[iblk].nets[ipin];
+                inet = blocks[iblk].nets[ipin];
 
                 if (inet != OPEN) {
                     if (num_pins_connected[inet] > 1) {
-                        printf
-                        ("Warning:  block %d (%s) connects %d pins of class "
+                        printf("Warning:  block %d (%s) connects %d pins of class "
                          "%d to net %d (%s).\n", iblk,
-                         block[iblk].name,
+                         blocks[iblk].name,
                          num_pins_connected[inet],
                          iclass, inet,
                          net[inet].name);
@@ -445,17 +436,15 @@ check_for_multiple_sink_connections(void)
 }
 
 
-static int
-get_num_conn(int block_num)
+static int get_num_conn(int block_num)
 {
     /* This routine returns the number of connections to a block. */
-    int i, num_conn;
-    block_type_ptr type;
-    type = block[block_num].type;
-    num_conn = 0;
+    block_type_ptr type = blocks[block_num].block_type;
+    int num_conn = 0;
 
+    int i;
     for (i = 0; i < type->num_pins; i++) {
-        if (block[block_num].nets[i] != OPEN) {
+        if (blocks[block_num].nets[i] != OPEN) {
             num_conn++;
         }
     }
@@ -473,20 +462,17 @@ check_internal_subblock_connections(subblock_data_t* subblock_data_ptr,
      * completely empty (no pins hooked to anything) or have their output used   *
      * somewhere.  It also counts the number of constant generators (no input    *
      * sblks) and the number of FFs used in the circuit.                         */
-    int num_const_gen, num_ff, isub, ipin, error, opin, i;
-    boolean has_inputs, has_outputs;
-    int subblock_lut_size;
-    int num_subblocks;
-    subblock_t* subblock_inf;
-    block_type_ptr type;
-    type = block[iblk].type;
-    subblock_lut_size = type->max_subblock_inputs;
-    num_subblocks = subblock_data_ptr->num_subblocks_per_block[iblk];
-    subblock_inf = subblock_data_ptr->subblock_inf[iblk];
-    num_const_gen = 0;
-    num_ff = 0;
-    error = 0;
+    block_type_ptr type = blocks[iblk].block_type;
+    int subblock_lut_size = type->max_subblock_inputs;
+    int num_subblocks = subblock_data_ptr->num_subblocks_per_block[iblk];
+    subblock_t* subblock_inf = subblock_data_ptr->subblock_inf[iblk];
 
+    int num_const_gen = 0;
+    int num_ff = 0;
+    int error = 0;
+
+    boolean has_inputs, has_outputs;
+    int isub, ipin, opin, i;
     for (isub = 0; isub < num_subblocks; isub++) {
         has_inputs = FALSE;
 
@@ -517,7 +503,7 @@ check_internal_subblock_connections(subblock_data_t* subblock_data_ptr,
                 ("Error:  output of subblock #%d (%s) of block #%d (%s) is "
                  "never used.\n", isub,
                  subblock_inf[isub].name, iblk,
-                 block[iblk].name);
+                 blocks[iblk].name);
                 error++;
             }
         }
@@ -531,14 +517,14 @@ check_internal_subblock_connections(subblock_data_t* subblock_data_ptr,
                     printf
                     ("Warning:  block #%d (%s), subblock #%d (%s) is a "
                      "constant generator.\n\t(Has no inputs.)\n",
-                     iblk, block[iblk].name, isub,
+                     iblk, blocks[iblk].name, isub,
                      subblock_inf[isub].name);
                     num_const_gen++;
                 } else {
                     printf
                     ("Error:  block #%d (%s), subblock #%d (%s) is a CLOCKED "
                      "\n\tconstant generator.\n\t(Has no inputs but is clocked.)\n",
-                     iblk, block[iblk].name, isub,
+                     iblk, blocks[iblk].name, isub,
                      subblock_inf[isub].name);
                     num_const_gen++;
                     error++;
@@ -579,7 +565,7 @@ check_fb_to_subblock_connections(int iblk,
     int ipin, isub, fb_pin, error;
     int num_outputs;
     error = 0;
-    num_outputs = block[iblk].type->max_subblock_outputs;
+    num_outputs = blocks[iblk].block_type->max_subblock_outputs;
 
     /* Count how many things connect to each clb output pin. */
 
@@ -593,23 +579,23 @@ check_fb_to_subblock_connections(int iblk,
         }
     }
 
-    for (ipin = 0; ipin < block[iblk].type->num_pins; ipin++) {
-        if (block[iblk].nets[ipin] != OPEN) {
-            if (is_opin(ipin, block[iblk].type)) {
+    for (ipin = 0; ipin < blocks[iblk].block_type->num_pins; ipin++) {
+        if (blocks[iblk].nets[ipin] != OPEN) {
+            if (is_opin(ipin, blocks[iblk].block_type)) {
                 /* FB output */
                 if (num_uses_of_fb_pin[ipin] == 0) {
                     /* No driver? */
                     printf
                     ("Error:  output pin %d on block #%d (%s) is not driven "
                      "by any subblock.\n", ipin, iblk,
-                     block[iblk].name);
+                     blocks[iblk].name);
                     error++;
                 } else if (num_uses_of_fb_pin[ipin] > 1) {
                     /* Multiple drivers? */
                     printf
                     ("Error:  output pin %d on block #%d (%s) is driven "
                      "by %d subblocks.\n", ipin, iblk,
-                     block[iblk].name,
+                     blocks[iblk].name,
                      num_uses_of_fb_pin[ipin]);
                     error++;
                 }
@@ -620,18 +606,18 @@ check_fb_to_subblock_connections(int iblk,
                     printf
                     ("Error:  pin %d on block #%d (%s) does not fanout to any "
                      "subblocks.\n", ipin, iblk,
-                     block[iblk].name);
+                     blocks[iblk].name);
                     error++;
                 }
             }
         }
         /* End if not OPEN */
-        else if (is_opin(ipin, block[iblk].type)) {
+        else if (is_opin(ipin, blocks[iblk].block_type)) {
             /* OPEN FB output pin */
             if (num_uses_of_fb_pin[ipin] > 1) {
                 printf
                 ("Error:  pin %d on block #%d (%s) is driven by %d "
-                 "subblocks.\n", ipin, iblk, block[iblk].name,
+                 "subblocks.\n", ipin, iblk, blocks[iblk].name,
                  num_uses_of_fb_pin[ipin]);
                 error++;
             }

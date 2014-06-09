@@ -62,7 +62,7 @@ static void free_crit(linked_vptr_t** chunk_list_head_ptr)
 /**************************************/
 void print_sink_delays(char* fname)
 {
-    int num_at_level, num_edges, inode, ilevel, i;
+    int num_at_level, num_out_edges, inode, ilevel, i;
     FILE* fp = my_fopen(fname, "w");
 
     for (ilevel = num_tnode_levels - 1; ilevel >= 0; ilevel--) {
@@ -70,11 +70,11 @@ void print_sink_delays(char* fname)
 
         for (i = 0; i < num_at_level; i++) {
             inode = tnodes_at_level[ilevel].list[i];
-            num_edges = tnode[inode].num_edges;
+            num_out_edges = vertexes[inode].num_out_edges;
 
-            if (num_edges == 0) {
+            if (num_out_edges == 0) {
                 /* sink */
-                fprintf(fp, "%g\n", tnode[inode].arr_time);
+                fprintf(fp, "%g\n", vertexes[inode].arr_time);
             }
         }
     }

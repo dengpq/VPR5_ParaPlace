@@ -88,9 +88,17 @@ void place_and_route(operation_types_t operation,
 
     if (placer_opts.place_freq == PLACE_NEVER) {
         /* Read the placement from a file */
-        read_place(place_file, net_file, arch_file, num_grid_columns, num_grid_rows, num_blocks,
-                   block);
-        sync_grid_to_blocks(num_blocks, block, num_grid_columns, num_grid_rows, grid);
+        read_place(place_file,
+                   net_file, arch_file,
+                   num_grid_columns,
+                   num_grid_rows,
+                   num_blocks,
+                   blocks);
+        sync_grid_to_blocks(num_blocks,
+                            blocks,
+                            num_grid_columns,
+                            num_grid_rows,
+                            clb_grids);
     } else {
         assert((PLACE_ONCE == placer_opts.place_freq) ||
                (PLACE_ALWAYS == placer_opts.place_freq));
@@ -101,7 +109,7 @@ void place_and_route(operation_types_t operation,
         print_place(place_file, net_file, arch_file);
     }
 
-    post_place_sync(num_blocks, block, subblock_data_ptr);
+    post_place_sync(num_blocks, blocks, subblock_data_ptr);
 
 
     fflush(stdout);
@@ -515,7 +523,7 @@ static int binary_search_place_and_route(placer_opts_t placer_opts,
     free_rr_graph();
 
     build_rr_graph(graph_type,
-                   num_types, type_descriptors, num_grid_columns, num_grid_rows, grid,
+                   num_types, type_descriptors, num_grid_columns, num_grid_rows, clb_grids,
                    chan_width_x[0], NULL,
                    det_routing_arch.switch_block_type, det_routing_arch.Fs,
                    det_routing_arch.num_segment, det_routing_arch.num_switch, segment_inf,
@@ -657,7 +665,6 @@ comp_width(channel_t* chan,
     double val;
 
     switch (chan->type) {
-
         case UNIFORM:
             val = chan->peak;
             break;
@@ -719,29 +726,26 @@ void post_place_sync(IN int num_blocks,
 
     /* Go through each block */
     for (iblk = 0; iblk < num_blocks; ++iblk) {
-        type = block[iblk].type;
+        type = blocks[iblk].block_type;
         assert(type->num_pins % type->capacity == 0);
         max_num_block_pins = type->num_pins / type->capacity;
 
         /* Logical location and physical location is offset by z * max_num_block_pins */
         /* Sync blocks and nets */
         for (j = 0; j < max_num_block_pins; j++) {
-            inet = block[iblk].nets[j];
+            inet = blocks[iblk].nets[j];
 
-            if (inet != OPEN && block[iblk].z > 0) {
-                assert(block[iblk].nets[j + block[iblk].z * max_num_block_pins] == OPEN);
-                block[iblk].nets[j + block[iblk].z * max_num_block_pins] =
-                                     block[iblk].nets[j];
-                block[iblk].nets[j] = OPEN;
+            if (inet != OPEN && blocks[iblk].z > 0) {
+                assert(blocks[iblk].nets[j + blocks[iblk].z * max_num_block_pins] == OPEN);
+                blocks[iblk].nets[j + blocks[iblk].z * max_num_block_pins] =
+                                     blocks[iblk].nets[j];
+                blocks[iblk].nets[j] = OPEN;
 
                 for (k = 0; k < type->num_pins; k++) {
-                    if (net[inet].node_block[k] == iblk) {
-                        assert(net[inet].
-                               node_block_pin[k] == j);
-                        net[inet].node_block_pin[k] =
-                            j +
-                            block[iblk].z *
-                            max_num_block_pins;
+                    if (net[inet].node_blocks[k] == iblk) {
+                        assert(net[inet].node_block_pins[k] == j);
+                        net[inet].node_block_pins[k] =
+                            j + blocks[iblk].z * max_num_block_pins;
                         break;
                     }
                 }
@@ -755,7 +759,7 @@ void post_place_sync(IN int num_blocks,
                 if (subblock_inf[iblk][j].inputs[k] != OPEN) {
                     subblock_inf[iblk][j].inputs[k] =
                         subblock_inf[iblk][j].inputs[k] +
-                        block[iblk].z * max_num_block_pins;
+                        blocks[iblk].z * max_num_block_pins;
                 }
             }
 
@@ -763,14 +767,14 @@ void post_place_sync(IN int num_blocks,
                 if (subblock_inf[iblk][j].outputs[k] != OPEN) {
                     subblock_inf[iblk][j].outputs[k] =
                         subblock_inf[iblk][j].outputs[k] +
-                        block[iblk].z * max_num_block_pins;
+                        blocks[iblk].z * max_num_block_pins;
                 }
             }
 
             if (subblock_inf[iblk][j].clock != OPEN) {
                 subblock_inf[iblk][j].clock =
                     subblock_inf[iblk][j].clock +
-                    block[iblk].z * max_num_block_pins;
+                    blocks[iblk].z * max_num_block_pins;
             }
         }
     }

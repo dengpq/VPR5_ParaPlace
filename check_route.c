@@ -174,30 +174,30 @@ check_route(router_types_t route_type,
     printf("Completed routing consistency check successfully.\n\n");
 }
 
-static void
-check_sink(int inode,
-           int inet,
-           boolean* pin_done)
+static void check_sink(int inode,
+                       int inet,
+                       boolean* pin_done)
 {
     /* Checks that this SINK node is one of the terminals of inet, and marks   *
      * the appropriate pin as being reached.                                   */
-    int i, j, ipin, ifound, ptc_num, block_num, iclass, node_block_pin, iblk;
-    block_type_ptr type;
     assert(rr_node[inode].type == SINK);
-    i = rr_node[inode].xlow;
-    j = rr_node[inode].ylow;
-    type = grid[i][j].type;
-    ptc_num = rr_node[inode].ptc_num;   /* For sinks, ptc_num is the class */
-    ifound = 0;
 
+    int ptc_num = rr_node[inode].ptc_num;   /* For sinks, ptc_num is the class */
+    int ifound = 0;
+
+    int i = rr_node[inode].xlow;
+    int j = rr_node[inode].ylow;
+    block_type_ptr type = clb_grids[i][j].grid_type;
+
+    int ipin, block_num, iclass, node_block_pin, iblk;
     for (iblk = 0; iblk < type->capacity; ++iblk) {
-        block_num = grid[i][j].blocks[iblk]; /* Hardcoded to one block */
+        block_num = clb_grids[i][j].in_blocks[iblk]; /* Hardcoded to one block */
 
         const int knum_net_pins = net[inet].num_net_pins;
         for (ipin = 1; ipin < knum_net_pins + 1; ++ipin) {
             /* All net SINKs */
-            if (net[inet].node_block[ipin] == block_num) {
-                node_block_pin = net[inet].node_block_pin[ipin];
+            if (net[inet].node_blocks[ipin] == block_num) {
+                node_block_pin = net[inet].node_block_pins[ipin];
                 iclass = type->pin_class[node_block_pin];
 
                 if (iclass == ptc_num) {
@@ -233,11 +233,9 @@ check_source(int inode,
              int inet)
 {
     /* Checks that the node passed in is a valid source for this net.        */
-    rr_type_t rr_type;
-    block_type_ptr type;
     int i, j, ptc_num, block_num, node_block_pin, iclass;
-    rr_type = rr_node[inode].type;
 
+    rr_type_t rr_type = rr_node[inode].type;
     if (rr_type != SOURCE) {
         printf
         ("Error in check_source:  net %d begins with a node of type %d.\n",
@@ -248,17 +246,17 @@ check_source(int inode,
     i = rr_node[inode].xlow;
     j = rr_node[inode].ylow;
     ptc_num = rr_node[inode].ptc_num;   /* for sinks and sources, ptc_num is class */
-    block_num = net[inet].node_block[0]; /* First node_block for net is the source */
-    type = grid[i][j].type;
+    block_num = net[inet].node_blocks[0]; /* First node_block for net is the source */
+    block_type_ptr type = clb_grids[i][j].grid_type;
 
-    if (block[block_num].x != i || block[block_num].y != j) {
+    if (blocks[block_num].x != i || blocks[block_num].y != j) {
         printf
         ("Error in check_source:  net SOURCE is in wrong location (%d,%d)."
          "\n", i, j);
         exit(1);
     }
 
-    node_block_pin = net[inet].node_block_pin[0];
+    node_block_pin = net[inet].node_block_pins[0];
     iclass = type->pin_class[node_block_pin];
 
     if (ptc_num != iclass) {
@@ -372,8 +370,8 @@ check_adjacent(int from_node,
 
             if (from_xlow == to_xlow && from_ylow == to_ylow
                     && from_xhigh == to_xhigh && from_yhigh == to_yhigh) {
-                from_grid_type = grid[from_xlow][from_ylow].type;
-                to_grid_type = grid[to_xlow][to_ylow].type;
+                from_grid_type = clb_grids[from_xlow][from_ylow].grid_type;
+                to_grid_type = clb_grids[to_xlow][to_ylow].grid_type;
                 assert(from_grid_type == to_grid_type);
                 iclass = to_grid_type->pin_class[to_ptc];
 
@@ -398,8 +396,8 @@ check_adjacent(int from_node,
 
             if (from_xlow == to_xlow && from_ylow == to_ylow
                     && from_xhigh == to_xhigh && from_yhigh == to_yhigh) {
-                from_grid_type = grid[from_xlow][from_ylow].type;
-                to_grid_type = grid[to_xlow][to_ylow].type;
+                from_grid_type = clb_grids[from_xlow][from_ylow].grid_type;
+                to_grid_type = clb_grids[to_xlow][to_ylow].grid_type;
                 assert(from_grid_type == to_grid_type);
                 iclass = from_grid_type->pin_class[from_ptc];
 
@@ -531,24 +529,20 @@ pin_and_chan_adjacent(int pin_node,
     /* Checks if pin_node is adjacent to chan_node.  It returns 1 if the two   *
      * nodes are adjacent and 0 if they are not (any other value means there's *
      * a bug in this routine).                                                 */
-    int num_adj, pin_xlow, pin_ylow, pin_xhigh, pin_yhigh, chan_xlow,
-        chan_ylow, chan_xhigh, chan_yhigh;
-    int pin_ptc, i;
-    rr_type_t chan_type;
-    block_type_ptr pin_grid_type;
-    num_adj = 0;
-    pin_xlow = rr_node[pin_node].xlow;
-    pin_ylow = rr_node[pin_node].ylow;
-    pin_xhigh = rr_node[pin_node].xhigh;
-    pin_yhigh = rr_node[pin_node].yhigh;
-    pin_grid_type = grid[pin_xlow][pin_ylow].type;
-    pin_ptc = rr_node[pin_node].ptc_num;
-    chan_type = rr_node[chan_node].type;
-    chan_xlow = rr_node[chan_node].xlow;
-    chan_ylow = rr_node[chan_node].ylow;
-    chan_xhigh = rr_node[chan_node].xhigh;
-    chan_yhigh = rr_node[chan_node].yhigh;
+    int num_adj = 0;
+    int pin_xlow = rr_node[pin_node].xlow;
+    int pin_ylow = rr_node[pin_node].ylow;
+    int pin_xhigh = rr_node[pin_node].xhigh;
+    int pin_yhigh = rr_node[pin_node].yhigh;
+    block_type_ptr pin_grid_type = clb_grids[pin_xlow][pin_ylow].grid_type;
 
+    int pin_ptc = rr_node[pin_node].ptc_num;
+    int chan_xlow = rr_node[chan_node].xlow;
+    int chan_ylow = rr_node[chan_node].ylow;
+    int chan_xhigh = rr_node[chan_node].xhigh;
+    int chan_yhigh = rr_node[chan_node].yhigh;
+
+    rr_type_t chan_type = rr_node[chan_node].type;
     if (chan_type == CHANX) {
         if (chan_ylow == pin_yhigh) {
             /* CHANX above FB */
@@ -565,6 +559,7 @@ pin_and_chan_adjacent(int pin_node,
             }
         }
     } else if (chan_type == CHANY) {
+        int i;
         for (i = 0; i < pin_grid_type->height; i++) {
             if (chan_xlow == pin_xhigh) {
                 /* CHANY to right of FB */
@@ -637,15 +632,12 @@ recompute_occupancy_from_scratch(vector_t** fb_opins_used_locally)
      * locally).                                                                */
 
     for (iblk = 0; iblk < num_blocks; iblk++) {
-        for (iclass = 0; iclass < block[iblk].type->num_class; iclass++) {
-            num_local_opins =
-                fb_opins_used_locally[iblk][iclass].nelem;
+        for (iclass = 0; iclass < blocks[iblk].block_type->num_class; iclass++) {
+            num_local_opins = fb_opins_used_locally[iblk][iclass].nelem;
 
             /* Will always be 0 for pads or SINK classes. */
             for (ipin = 0; ipin < num_local_opins; ipin++) {
-                inode =
-                    fb_opins_used_locally[iblk][iclass].
-                    list[ipin];
+                inode = fb_opins_used_locally[iblk][iclass].list[ipin];
                 rr_node[inode].occ++;
             }
         }
@@ -663,7 +655,7 @@ check_locally_used_fb_opins(vector_t** fb_opins_used_locally,
     rr_type_t rr_type;
 
     for (iblk = 0; iblk < num_blocks; iblk++) {
-        for (iclass = 0; iclass < block[iblk].type->num_class; iclass++) {
+        for (iclass = 0; iclass < blocks[iblk].block_type->num_class; iclass++) {
             num_local_opins =
                 fb_opins_used_locally[iblk][iclass].nelem;
             /* Always 0 for pads and for SINK classes */
@@ -681,20 +673,20 @@ check_locally_used_fb_opins(vector_t** fb_opins_used_locally,
                     ("Error in check_locally_used_opins:  Block #%d (%s)\n"
                      "\tclass %d locally used OPIN is of the wrong rr_type --\n"
                      "\tit is rr_node #%d of type %d.\n",
-                     iblk, block[iblk].name, iclass,
+                     iblk, blocks[iblk].name, iclass,
                      inode, rr_type);
                     exit(1);
                 }
 
                 ipin = rr_node[inode].ptc_num;
 
-                if (block[iblk].type->pin_class[ipin] != iclass) {
+                if (blocks[iblk].block_type->pin_class[ipin] != iclass) {
                     printf
                     ("Error in check_locally_used_opins:  Block #%d (%s):\n"
                      "\tExpected class %d locally used OPIN, got class %d."
                      "\trr_node #: %d.\n", iblk,
-                     block[iblk].name, iclass,
-                     block[iblk].type->pin_class[ipin],
+                     blocks[iblk].name, iclass,
+                     blocks[iblk].block_type->pin_class[ipin],
                      inode);
                     exit(1);
                 }

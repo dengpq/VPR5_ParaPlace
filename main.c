@@ -62,7 +62,7 @@ int num_nets = 0;
 net_t* net = NULL;
 
 int num_blocks = 0;
-block_t* block = NULL;
+block_t* blocks = NULL;
 
 
 /* This identifies the block_type_ptr of an IO block */
@@ -89,7 +89,7 @@ int* chan_width_x = NULL;   /* [0..num_grid_rows] */
 int* chan_width_y = NULL;   /* [0..num_grid_columns] */
 
 /* [0..(num_grid_columns+1)][0..(num_grid_rows+1)] Physical block list */
-grid_tile_t** grid = NULL;
+grid_tile_t** clb_grids = NULL;
 
 
 /******** Structures defining the routing ********/

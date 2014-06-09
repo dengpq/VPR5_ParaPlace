@@ -49,16 +49,16 @@ static linked_double_ptr* linked_f_pointer_free_head = NULL;
 
 /*  The numbering relation between the channels and clbs is:               *
  *                                                                         *
- *  |   IO    | chan_   |   FB      | chan_   |   FB     |               *
- *  |grid[0][2]| y[0][2] | grid[1][2]  | y[1][2] |  grid[2][2]|               *
+ *  |   IO    | chan_   |   FB       | chan_   |   FB     |               *
+ *  |grid[0][2]| y[0][2]| grid[1][2] | y[1][2] |grid[2][2]|               *
  *  +-------- +         +------------+         +-----------+               *
  *                                                           } capacity in *
  *   No channel          chan_x[1][1]          chan_x[2][1]  } chan_width  *
  *                                                           } _x[1]       *
  *  +---------+         +------------+         +-----------+               *
  *  |         | chan_   |            | chan_   |           |               *
- *  |  IO     | y[0][1] |    FB     | y[1][1] |   FB     |               *
- *  |grid[0][1]|         |  grid[1][1] |         | grid[2][1] |               *
+ *  |  IO     | y[0][1] |    FB      | y[1][1] |   FB      |               *
+ *  |grid[0][1]|        | grid[1][1] |         | grid[2][1]|               *
  *  |         |         |            |         |           |               *
  *  +---------+         +------------+         +-----------+               *
  *                                                           } capacity in *
@@ -67,7 +67,7 @@ static linked_double_ptr* linked_f_pointer_free_head = NULL;
  *                      +------------+         +-----------+               *
  *              No      |            | No      |           |               *
  *            Channel   |    IO      | Channel |   IO      |               *
- *                      |  grid[1][0] |         | grid[2][0] |               *
+ *                      | grid[1][0] |         | grid[2][0]|               *
  *                      |            |         |           |               *
  *                      +------------+         +-----------+               *
  *                                                                         *
@@ -75,8 +75,6 @@ static linked_double_ptr* linked_f_pointer_free_head = NULL;
  *            Capacity in            Capacity in                           *
  *          chan_width_y[0]        chan_width_y[1]                         *
  *                                                                         */
-
-
 /******************** Subroutines local to route_common.c *******************/
 
 static void free_trace_data(trace_t* tptr);
@@ -133,12 +131,11 @@ save_routing(trace_t** best_routing,
 
     /* Save which OPINs are locally used.                           */
 
-    for (iblk = 0; iblk < num_blocks; iblk++) {
-        type = block[iblk].type;
+    for (iblk = 0; iblk < num_blocks; ++iblk) {
+        type = blocks[iblk].block_type;
 
-        for (iclass = 0; iclass < type->num_class; iclass++) {
-            num_local_opins =
-                fb_opins_used_locally[iblk][iclass].nelem;
+        for (iclass = 0; iclass < type->num_class; ++iclass) {
+            num_local_opins = fb_opins_used_locally[iblk][iclass].nelem;
 
             for (ipin = 0; ipin < num_local_opins; ipin++) {
                 saved_clb_opins_used_locally[iblk][iclass].
@@ -174,9 +171,8 @@ restore_routing(trace_t** best_routing,
     }
 
     /* Save which OPINs are locally used.                           */
-
-    for (iblk = 0; iblk < num_blocks; iblk++) {
-        type = block[iblk].type;
+    for (iblk = 0; iblk < num_blocks; ++iblk) {
+        type = blocks[iblk].block_type;
 
         for (iclass = 0; iclass < type->num_class; iclass++) {
             num_local_opins =
@@ -260,7 +256,7 @@ try_route(int width_fac,
     free_rr_graph();
     /* Set up the routing resource graph defined by this FPGA architecture. */
     build_rr_graph(graph_type,
-                   num_types, type_descriptors, num_grid_columns, num_grid_rows, grid,
+                   num_types, type_descriptors, num_grid_columns, num_grid_rows, clb_grids,
                    chan_width_x[0], NULL,
                    det_routing_arch.switch_block_type, det_routing_arch.Fs,
                    det_routing_arch.num_segment, det_routing_arch.num_switch, segment_inf,
@@ -663,7 +659,7 @@ alloc_saved_routing(vector_t** fb_opins_used_locally,
         (vector_t**) my_malloc(num_blocks* sizeof(vector_t*));
 
     for (iblk = 0; iblk < num_blocks; iblk++) {
-        type = block[iblk].type;
+        type = blocks[iblk].block_type;
         saved_clb_opins_used_locally[iblk] =
             (vector_t*) my_malloc(type->num_class * sizeof(vector_t));
 
@@ -707,7 +703,7 @@ alloc_and_load_clb_opins_used_locally(subblock_data_t subblock_data)
     subblock_inf = subblock_data.subblock_inf;
 
     for (iblk = 0; iblk < num_blocks; iblk++) {
-        type = block[iblk].type;
+        type = blocks[iblk].block_type;
         get_class_range_for_block(iblk, &class_low, &class_high);
         fb_opins_used_locally[iblk] =
             (vector_t*) my_malloc(type->num_class * sizeof(vector_t));
@@ -717,13 +713,11 @@ alloc_and_load_clb_opins_used_locally(subblock_data_t subblock_data)
         }
 
         for (isub = 0; isub < num_subblocks_per_block[iblk]; isub++) {
-            for (opin = 0;
-                    opin < block[iblk].type->max_subblock_outputs; opin++) {
+            for (opin = 0; opin < blocks[iblk].block_type->max_subblock_outputs; opin++) {
                 clb_pin = subblock_inf[iblk][isub].outputs[opin];
 
                 /* Subblock output used only locally, but must connect to a FB OPIN?  */
-                if (clb_pin != OPEN
-                        && block[iblk].nets[clb_pin] == OPEN) {
+                if (clb_pin != OPEN && blocks[iblk].nets[clb_pin] == OPEN) {
                     iclass = type->pin_class[clb_pin];
                     /* Check to make sure class is in same range as that assigned to block */
                     assert(iclass >= class_low
@@ -780,7 +774,7 @@ free_route_structs(vector_t** fb_opins_used_locally)
 
     for (i = 0; i < num_blocks; i++) {
         free_ivec_vector(fb_opins_used_locally[i], 0,
-                         block[i].type->num_class - 1);
+                         blocks[i].block_type->num_class - 1);
     }
 
     free(fb_opins_used_locally);
@@ -799,7 +793,7 @@ free_saved_routing(trace_t** best_routing,
 
     for (i = 0; i < num_blocks; i++) {
         free_ivec_vector(saved_clb_opins_used_locally[i], 0,
-                         block[i].type->num_class - 1);
+                         blocks[i].block_type->num_class - 1);
     }
 
     free(saved_clb_opins_used_locally);
@@ -857,9 +851,9 @@ load_route_bb(int bb_factor)
      * (num_grid_columns,num_grid_rows).                                                            */
     int k, xmax, ymax, xmin, ymin, x, y, inet;
 
-    for (inet = 0; inet < num_nets; inet++) {
-        x = block[net[inet].node_block[0]].x;
-        y = block[net[inet].node_block[0]].y;
+    for (inet = 0; inet < num_nets; ++inet) {
+        x = blocks[net[inet].node_blocks[0]].x;
+        y = blocks[net[inet].node_blocks[0]].y;
         xmin = x;
         ymin = y;
         xmax = x;
@@ -867,8 +861,8 @@ load_route_bb(int bb_factor)
 
         const int knum_net_pins = net[inet].num_net_pins;
         for (k = 1; k <= knum_net_pins; ++k) {
-            x = block[net[inet].node_block[k]].x;
-            y = block[net[inet].node_block[k]].y;
+            x = blocks[net[inet].node_blocks[k]].x;
+            y = blocks[net[inet].node_blocks[k]].y;
 
             if (x < xmin) {
                 xmin = x;
@@ -1151,17 +1145,14 @@ alloc_linked_f_pointer(void) {
 }
 
 
-void
-print_route(char* route_file)
+void print_route(char* route_file)
 {
     /* Prints out the routing to file route_file.  */
     int inet, inode, ipin, block_num, ilow, jlow, node_block_pin, iclass;
     rr_type_t rr_type;
     trace_t* tptr;
-    char* name_type[] =
-    { "SOURCE", "SINK", "IPIN", "OPIN", "CHANX", "CHANY" };
-    FILE* fp;
-    fp = my_fopen(route_file, "w");
+    char* name_type[] = { "SOURCE", "SINK", "IPIN", "OPIN", "CHANX", "CHANY" };
+    FILE* fp = my_fopen(route_file, "w");
     fprintf(fp, "Array size: %d x %d logic blocks.\n", num_grid_columns, num_grid_rows);
     fprintf(fp, "\nRouting:");
 
@@ -1189,7 +1180,7 @@ print_route(char* route_file)
                 switch (rr_type) {
                     case IPIN:
                     case OPIN:
-                        if (grid[ilow][jlow].type == IO_TYPE) {
+                        if (clb_grids[ilow][jlow].grid_type == IO_TYPE) {
                             fprintf(fp, " Pad: ");
                         } else {
                             /* IO Pad. */
@@ -1205,7 +1196,7 @@ print_route(char* route_file)
 
                     case SOURCE:
                     case SINK:
-                        if (grid[ilow][jlow].type == IO_TYPE) {
+                        if (clb_grids[ilow][jlow].grid_type == IO_TYPE) {
                             fprintf(fp, " Pad: ");
                         } else {
                             /* IO Pad. */
@@ -1237,14 +1228,13 @@ print_route(char* route_file)
 
             const int knum_net_pins = net[inet].num_net_pins;
             for (ipin = 0; ipin <= knum_net_pins; ++ipin) {
-                block_num = net[inet].node_block[ipin];
-                node_block_pin = net[inet].node_block_pin[ipin];
+                block_num = net[inet].node_blocks[ipin];
+                node_block_pin = net[inet].node_block_pins[ipin];
                 iclass =
-                    block[block_num].type->pin_class[node_block_pin];
-                fprintf(fp,
-                        "Block %s (#%d) at (%d, %d), Pin class %d.\n",
-                        block[block_num].name, block_num, block[block_num].x,
-                        block[block_num].y, iclass);
+                    blocks[block_num].block_type->pin_class[node_block_pin];
+                fprintf(fp, "Block %s (#%d) at (%d, %d), Pin class %d.\n",
+                        blocks[block_num].name, block_num, blocks[block_num].x,
+                        blocks[block_num].y, iclass);
             }
         }
     }
@@ -1280,8 +1270,8 @@ reserve_locally_used_opins(double pres_fac,
     block_type_ptr type;
 
     if (rip_up_local_opins) {
-        for (iblk = 0; iblk < num_blocks; iblk++) {
-            type = block[iblk].type;
+        for (iblk = 0; iblk < num_blocks; ++iblk) {
+            type = blocks[iblk].block_type;
 
             for (iclass = 0; iclass < type->num_class; iclass++) {
                 num_local_opin =
@@ -1289,9 +1279,7 @@ reserve_locally_used_opins(double pres_fac,
 
                 /* Always 0 for pads and for RECEIVER (IPIN) classes */
                 for (ipin = 0; ipin < num_local_opin; ipin++) {
-                    inode =
-                        fb_opins_used_locally[iblk][iclass].
-                        list[ipin];
+                    inode = fb_opins_used_locally[iblk][iclass].list[ipin];
                     adjust_one_rr_occ_and_pcost(inode, -1,
                                                 pres_fac);
                 }
@@ -1299,8 +1287,8 @@ reserve_locally_used_opins(double pres_fac,
         }
     }
 
-    for (iblk = 0; iblk < num_blocks; iblk++) {
-        type = block[iblk].type;
+    for (iblk = 0; iblk < num_blocks; ++iblk) {
+        type = blocks[iblk].block_type;
 
         for (iclass = 0; iclass < type->num_class; iclass++) {
             num_local_opin =

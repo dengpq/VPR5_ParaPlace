@@ -92,7 +92,6 @@ min_dist_from_mst(int node_outside,
                   boolean* in_mst,
                   int* node_inside)
 {
-    int ipin, blk1, blk2, dist;
     /* given a node outside the mst this routine finds its shortest distance to the current partial
      * mst, as well as the corresponding node inside mst */
     int closest_node_in_mst = -1;
@@ -100,13 +99,14 @@ min_dist_from_mst(int node_outside,
 
     /* search over all blocks inside mst */
     const int knum_net_pins = net[inet].num_net_pins;
+    int ipin = -1;
     for (ipin = 0; ipin < knum_net_pins + 1; ++ipin) {
         if (in_mst[ipin]) {
-            blk1 = net[inet].node_block[node_outside];
-            blk2 = net[inet].node_block[ipin];
-            dist = ABS_DIFF(block[blk1].x,
-                            block[blk2].x) + ABS_DIFF(block[blk1].y,
-                                                      block[blk2].y);
+            int blk1 = net[inet].node_blocks[node_outside];
+            int blk2 = net[inet].node_blocks[ipin];
+            int dist = ABS_DIFF(blocks[blk1].x,
+                                blocks[blk2].x) + ABS_DIFF(blocks[blk1].y,
+                                                           blocks[blk2].y);
 
             if (closest_node_in_mst == -1) {
                 closest_node_in_mst = ipin;

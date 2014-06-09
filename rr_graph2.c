@@ -580,14 +580,13 @@ get_bidir_opin_connections(IN int i,
                            IN vector_t** * rr_node_indices,
                            IN segment_details_t* seg_details)
 {
-    int iside, num_conn, ofs, tr_i, tr_j, chan, seg;
+    int iside, tr_i, tr_j, chan, seg;
     int to_track, to_switch, to_node, iconn;
     int is_connected_track;
-    block_type_ptr type;
     rr_type_t to_type;
-    type = grid[i][j].type;
-    ofs = grid[i][j].offset;
-    num_conn = 0;
+    block_type_ptr type = clb_grids[i][j].grid_type;
+    int ofs = clb_grids[i][j].m_offset;
+    int num_conn = 0;
 
     /* [0..num_types-1][0..num_pins-1][0..height][0..3][0..Fc-1] */
     for (iside = 0; iside < 4; iside++) {
@@ -867,10 +866,10 @@ alloc_and_load_rr_node_indices(IN int nodes_per_chan,
     /* Count indices for block nodes */
     for (i = 0; i <= (num_grid_columns + 1); i++) {
         for (j = 0; j <= (num_grid_rows + 1); j++) {
-            ofs = grid[i][j].offset;
+            ofs = clb_grids[i][j].m_offset;
 
             if (0 == ofs) {
-                type = grid[i][j].type;
+                type = clb_grids[i][j].grid_type;
                 /* Load the pin class lookups. The ptc nums for SINK and SOURCE
                  * are disjoint so they can share the list. */
                 tmp.nelem = type->num_class;
@@ -912,7 +911,7 @@ alloc_and_load_rr_node_indices(IN int nodes_per_chan,
     /* Point offset blocks of a large block to base block */
     for (i = 0; i <= (num_grid_columns + 1); i++) {
         for (j = 0; j <= (num_grid_rows + 1); j++) {
-            ofs = grid[i][j].offset;
+            ofs = clb_grids[i][j].m_offset;
 
             if (ofs > 0) {
                 /* NOTE: this only supports vertical large blocks */
@@ -946,7 +945,7 @@ free_rr_node_indices(IN vector_t** * rr_node_indices)
      * alloc_and_load_rr_node_indices. */
     for (i = 0; i <= (num_grid_columns + 1); ++i) {
         for (j = 0; j <= (num_grid_rows + 1); ++j) {
-            ofs = grid[i][j].offset;
+            ofs = clb_grids[i][j].m_offset;
 
             if (ofs > 0) {
                 /* Vertical large blocks reference is same as offset 0 */
@@ -1029,7 +1028,7 @@ get_rr_node_index(int x,
     assert(ptc >= 0);
     assert(x >= 0 && x <= (num_grid_columns + 1));
     assert(y >= 0 && y <= (num_grid_rows + 1));
-    type = grid[x][y].type;
+    type = clb_grids[x][y].grid_type;
 
     /* Currently need to swap x and y for CHANX because of chan, seg convention */
     if (CHANX == rr_type) {
@@ -1123,7 +1122,7 @@ get_track_to_ipins(int seg,
                 }
 
                 /* PAJ - if the pointed to is an EMPTY then shouldn't look for ipins */
-                if (grid[x][y].type == EMPTY_TYPE) {
+                if (clb_grids[x][y].grid_type == EMPTY_TYPE) {
                     continue;
                 }
 
@@ -1134,22 +1133,17 @@ get_track_to_ipins(int seg,
                     vpr_to_phy_track(track, chan, j, seg_details,
                                      directionality);
                 /* We need the type to find the ipin map for this type */
-                type = grid[x][y].type;
-                off = grid[x][y].offset;
+                type = clb_grids[x][y].grid_type;
+                off = clb_grids[x][y].m_offset;
                 max_conn =
-                    track_to_ipin_lookup[type->
-                                         index][phy_track][off]
-                    [side].nelem;
+                  track_to_ipin_lookup[type->index][phy_track][off][side].nelem;
 
                 for (iconn = 0; iconn < max_conn; iconn++) {
                     ipin =
-                        track_to_ipin_lookup[type->
-                                             index][phy_track]
-                        [off][side].list[iconn];
+                    track_to_ipin_lookup[type->index][phy_track][off][side].list[iconn];
                     /* Check there is a connection and Fc map isn't wrong */
                     assert(type->pinloc[off][side][ipin]);
-                    assert(type->is_global_pin[ipin] ==
-                           FALSE);
+                    assert(type->is_global_pin[ipin] == FALSE);
                     to_node =
                         get_rr_node_index(x, y, IPIN, ipin,
                                           rr_node_indices);

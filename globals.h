@@ -13,14 +13,14 @@ extern int num_nets;
 extern net_t* net;
 
 extern int num_blocks;
-extern block_t* block;
+extern block_t* blocks;
 
 /* Physical FPGA architecture stuff */
 extern int num_grid_columns, num_grid_rows;
 
 /* chan_width_x is the x-directed channel; i.e. between rows */
 extern int* chan_width_x, *chan_width_y;    /* numerical form */
-extern grid_tile_t** grid;
+extern grid_tile_t** clb_grids;
 
 /* [0..num_nets-1] of linked list start pointers.  Defines the routing.  */
 extern trace_t** trace_head, ** trace_tail;

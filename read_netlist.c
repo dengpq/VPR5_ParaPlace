@@ -37,11 +37,6 @@ void read_netlist(IN const char* net_file,
              OUT int* num_nets,
              OUT net_t* net_list[])
 {
-    FILE* infile;
-    int bcount;
-    block_t* blist;
-    int ncount;
-    net_t* nlist;
     int i, j, k, l, m;
     enum
     { COUNT, LOAD, MAP, STOP }
@@ -54,11 +49,11 @@ void read_netlist(IN const char* net_file,
     subblock_t** slist = NULL;
     int* scount = NULL;
     block_type_ptr type = NULL;
-    infile = my_fopen(net_file, "r");
-    bcount = 0;
-    blist = NULL;
-    ncount = 0;
-    nlist = NULL;
+    FILE* infile = my_fopen(net_file, "r");
+    int bcount = 0;
+    block_t* blist = NULL;
+    int ncount = 0;
+    net_t* nlist = NULL;
     memset(subblock_data_ptr, 0, sizeof(subblock_data_t));
 
     /* Multi-pass load
@@ -227,10 +222,8 @@ void read_netlist(IN const char* net_file,
             /* Load block name and type and alloc net list */
             if (LOAD == pass) {
                 blist[i].name = my_strdup(block_tokens[1]);
-                blist[i].type = type;
-                blist[i].nets =
-                    (int*)my_malloc(sizeof(int) *
-                                    type->num_pins);
+                blist[i].block_type = type;
+                blist[i].nets = (int*)my_malloc(sizeof(int) * type->num_pins);
 
                 for (k = 0; k < type->num_pins; ++k) {
                     blist[i].nets[k] = OPEN;
@@ -304,21 +297,16 @@ void read_netlist(IN const char* net_file,
                         slist[i][k].clock = OPEN;
                         slist[i][k].inputs =
                             (int*)my_malloc(sizeof(int) *
-                                            type->
-                                            max_subblock_inputs);
+                                            type->max_subblock_inputs);
 
-                        for (l = 0; l < type->max_subblock_inputs;
-                                ++l) {
+                        for (l = 0; l < type->max_subblock_inputs; ++l) {
                             slist[i][k].inputs[l] = OPEN;
                         }
 
                         slist[i][k].outputs =
-                            (int*)my_malloc(sizeof(int) *
-                                            type->
-                                            max_subblock_outputs);
+                            (int*)my_malloc(sizeof(int) * type->max_subblock_outputs);
 
-                        for (l = 0; l < type->max_subblock_outputs;
-                                ++l) {
+                        for (l = 0; l < type->max_subblock_outputs; ++l) {
                             slist[i][k].outputs[l] = OPEN;
                         }
                     }
@@ -356,8 +344,7 @@ void read_netlist(IN const char* net_file,
                         /* Check prefix and load pin num */
                         l = 2 + k;
 
-                        if (0 ==
-                                strncmp("ble_", tokens[l], 4)) {
+                        if (0 == strncmp("ble_", tokens[l], 4)) {
                             slist[i][m].inputs[k] = type->num_pins + my_atoi(tokens[l] + 4);    /* Skip the 'ble_' part */
                         } else if (0 !=
                                    strcmp("open", tokens[l])) {
@@ -366,10 +353,8 @@ void read_netlist(IN const char* net_file,
                         }
                     }
 
-                    for (k = 0; k < type->max_subblock_outputs;
-                            ++k) {
-                        l = 2 +
-                            type->max_subblock_inputs + k;
+                    for (k = 0; k < type->max_subblock_outputs; ++k) {
+                        l = 2 + type->max_subblock_inputs + k;
 
                         if (0 != strcmp("open", tokens[l])) {
                             slist[i][m].outputs[k] =
@@ -377,8 +362,7 @@ void read_netlist(IN const char* net_file,
                         }
                     }
 
-                    l = 2 + type->max_subblock_inputs +
-                        type->max_subblock_outputs;
+                    l = 2 + type->max_subblock_inputs + type->max_subblock_outputs;
 
                     if (0 != strcmp("open", tokens[l])) {
                         slist[i][m].clock =
