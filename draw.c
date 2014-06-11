@@ -470,7 +470,7 @@ static void drawplace(void)
     for (i = 0; i <= (num_grid_columns + 1); i++) {
         for (j = 0; j <= (num_grid_rows + 1); j++) {
             /* Only the first blocks of a group should control drawing */
-            if (clb_grids[i][j].m_offset > 0) {
+            if (bin_grids[i][j].m_offset > 0) {
                 continue;
             }
 
@@ -479,9 +479,9 @@ static void drawplace(void)
                 continue;
             }
 
-            num_sub_tiles = clb_grids[i][j].grid_type->capacity;
+            num_sub_tiles = bin_grids[i][j].grid_type->capacity;
             sub_tile_step = tile_width / num_sub_tiles;
-            height = clb_grids[i][j].grid_type->height;
+            height = bin_grids[i][j].grid_type->height;
 
             if (num_sub_tiles < 1) {
                 setcolor(BLACK);
@@ -520,7 +520,7 @@ static void drawplace(void)
                 }
 
                 /* Look at the tile at start of large blocks */
-                block_num = clb_grids[i][j].in_blocks[k];
+                block_num = bin_grids[i][j].in_blocks[k];
 
                 /* Draw background */
                 if (block_num != EMPTY) {
@@ -528,10 +528,10 @@ static void drawplace(void)
                     fillrect(x1, y1, x2, y2);
                 } else {
                     // colour empty blocks a particular colour depending on type
-                    if (clb_grids[i][j].grid_type->index < 3) {
+                    if (bin_grids[i][j].grid_type->index < 3) {
                         setcolor(WHITE);
-                    } else if (clb_grids[i][j].grid_type->index < 3 + MAX_BLOCK_COLOURS) {
-                        setcolor(BISQUE + clb_grids[i][j].grid_type->index - 3);
+                    } else if (bin_grids[i][j].grid_type->index < 3 + MAX_BLOCK_COLOURS) {
+                        setcolor(BISQUE + bin_grids[i][j].grid_type->index - 3);
                     } else {
                         setcolor(BISQUE + MAX_BLOCK_COLOURS - 1);
                     }
@@ -550,10 +550,10 @@ static void drawplace(void)
                 }
 
                 /* Draw text for blocks type so that user knows what blocks */
-                if (clb_grids[i][j].m_offset == 0) {
+                if (bin_grids[i][j].m_offset == 0) {
                     if (i > 0 && i <= num_grid_columns && j > 0 && j <= num_grid_rows) {
                         drawtext((x1 + x2) / 2.0, y1 + (tile_width / 4.0),
-                                 clb_grids[i][j].grid_type->name, tile_width);
+                                 bin_grids[i][j].grid_type->name, tile_width);
                     }
                 }
             }
@@ -1312,14 +1312,14 @@ draw_rr_pin(int inode,
     int i = rr_node[inode].xlow;
     int j = rr_node[inode].ylow;
     int ipin = rr_node[inode].ptc_num;
-    block_type_ptr type = clb_grids[i][j].grid_type;
-    int ioff = clb_grids[i][j].m_offset;
+    block_type_ptr type = bin_grids[i][j].grid_type;
+    int ioff = bin_grids[i][j].m_offset;
     setcolor(color);
 
     /* TODO: This is where we can hide fringe physical pins and also identify globals (hide, color, show) */
     int iside = -1;
     for (iside = 0; iside < 4; iside++) {
-        if (type->pinloc[clb_grids[i][j].m_offset][iside][ipin]) {
+        if (type->pinloc[bin_grids[i][j].m_offset][iside][ipin]) {
             /* Pin exists on this side. */
             get_rr_pin_draw_coords(inode, iside, ioff, &xcen, &ycen);
             fillrect(xcen - pin_size, ycen - pin_size,
@@ -1346,9 +1346,9 @@ get_rr_pin_draw_coords(int inode,
     int i = rr_node[inode].xlow;
     int j = rr_node[inode].ylow + ioff; /* Need correct tile of blocks */
     int ipin = rr_node[inode].ptc_num;
-    block_type_ptr type = clb_grids[i][j].grid_type;
-    int pins_per_sub_tile = clb_grids[i][j].grid_type->num_pins /
-                              clb_grids[i][j].grid_type->capacity;
+    block_type_ptr type = bin_grids[i][j].grid_type;
+    int pins_per_sub_tile = bin_grids[i][j].grid_type->num_pins /
+                              bin_grids[i][j].grid_type->capacity;
     int k = ipin / pins_per_sub_tile;
     /* Since pins numbers go across all sub_tiles in a blocks in order
      * we can treat as a blocks box for this step */
@@ -1638,11 +1638,11 @@ static void highlight_blocks(double x,
         if (x <= tile_x[i] + tile_width) {
             if (x >= tile_x[i]) {
                 for (j = 0; j <= (num_grid_rows + 1) && !hit; j++) {
-                    if (clb_grids[i][j].m_offset != 0) {
+                    if (bin_grids[i][j].m_offset != 0) {
                         continue;
                     }
 
-                    type = clb_grids[i][j].grid_type;
+                    type = bin_grids[i][j].grid_type;
 
                     if (y <= tile_y[j + type->height - 1] + tile_width) {
                         if (y >= tile_y[j]) {
@@ -1663,7 +1663,7 @@ static void highlight_blocks(double x,
         return;
     }
 
-    type = clb_grids[i][j].grid_type;
+    type = bin_grids[i][j].grid_type;
     hit = 0;
 
     if (EMPTY_TYPE == type) {
@@ -1683,13 +1683,13 @@ static void highlight_blocks(double x,
 
     assert(k < type->capacity);
 
-    if (clb_grids[i][j].in_blocks[k] == EMPTY) {
+    if (bin_grids[i][j].in_blocks[k] == EMPTY) {
         update_message(default_message);
         drawscreen();
         return;
     }
 
-    block_num = clb_grids[i][j].in_blocks[k];
+    block_num = bin_grids[i][j].in_blocks[k];
 
     /* Highlight fanin and fanout. */
     for (k = 0; k < type->num_pins; k++) {
@@ -1804,12 +1804,12 @@ draw_pin_to_chan_edge(int pin_node,
 
     int grid_x = rr_node[pin_node].xlow;
     int grid_y = rr_node[pin_node].ylow;
-    int ioff = clb_grids[grid_x][grid_y].m_offset;
+    int ioff = bin_grids[grid_x][grid_y].m_offset;
     /* large blocks begins at primary tile (offset == 0) */
     grid_y = grid_y - ioff;
 
-    block_type_ptr type = clb_grids[grid_x][grid_y].grid_type;
-    int height = clb_grids[grid_x][grid_y].grid_type->height;
+    block_type_ptr type = bin_grids[grid_x][grid_y].grid_type;
+    int height = bin_grids[grid_x][grid_y].grid_type->height;
     int chan_ylow = rr_node[chan_node].ylow;
     int chan_xlow = rr_node[chan_node].xlow;
     int start = -1;
@@ -1843,7 +1843,7 @@ draw_pin_to_chan_edge(int pin_node,
                 draw_pin_off = -pin_size;
             }
 
-            assert(clb_grids[grid_x][grid_y].grid_type->pinloc[ioff][iside][pin_num]);
+            assert(bin_grids[grid_x][grid_y].grid_type->pinloc[ioff][iside][pin_num]);
             get_rr_pin_draw_coords(pin_node, iside, ioff, &x1, &y1);
             y1 += draw_pin_off;
             y2 = tile_y[rr_node[chan_node].ylow] + tile_width + 1. + itrack;
@@ -1894,13 +1894,13 @@ draw_pin_to_chan_edge(int pin_node,
                  * this will fail.  With the correct routing graph, the assertion will not
                  * be triggered.  This also takes care of connecting a wire once to multiple
                  * physical pins on the same side. */
-                if (clb_grids[grid_x][grid_y].grid_type->
+                if (bin_grids[grid_x][grid_y].grid_type->
                         pinloc[ioff][iside][pin_num]) {
                     break;
                 }
             }
 
-            assert(clb_grids[grid_x][grid_y].grid_type->pinloc[ioff][iside][pin_num]);
+            assert(bin_grids[grid_x][grid_y].grid_type->pinloc[ioff][iside][pin_num]);
             get_rr_pin_draw_coords(pin_node, iside, ioff, &x1, &y1);
             x1 += draw_pin_off;
             x2 = tile_x[chan_xlow] + tile_width + 1 + itrack;

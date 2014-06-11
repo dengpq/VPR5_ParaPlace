@@ -988,30 +988,30 @@ static void ProcessTypeProps(ezxml_t Node,
 static void ProcessLayout(INOUT ezxml_t Node,
                           OUT struct s_arch* arch)
 {
-    arch->clb_grid.IsAuto = TRUE;
+    arch->bin_grids.IsAuto = TRUE;
     /* Load width and height if applicable */
     const char* Prop = FindProperty(Node, "width", FALSE);
     if (Prop != NULL) {
-        arch->clb_grid.IsAuto = FALSE;
-        arch->clb_grid.W = my_atoi(Prop);
+        arch->bin_grids.IsAuto = FALSE;
+        arch->bin_grids.W = my_atoi(Prop);
         ezxml_set_attr(Node, "width", NULL);
         Prop = FindProperty(Node, "height", TRUE);
 
         if (Prop != NULL) {
-            arch->clb_grid.H = my_atoi(Prop);
+            arch->bin_grids.H = my_atoi(Prop);
             ezxml_set_attr(Node, "height", NULL);
         }
     }
 
     /* Load aspect ratio if applicable */
-    Prop = FindProperty(Node, "auto", arch->clb_grid.IsAuto);
+    Prop = FindProperty(Node, "auto", arch->bin_grids.IsAuto);
     if (Prop != NULL) {
-        if (arch->clb_grid.IsAuto == FALSE) {
+        if (arch->bin_grids.IsAuto == FALSE) {
             printf(ERRTAG
                    "Auto-sizing, width and height cannot be specified\n");
         }
 
-        arch->clb_grid.Aspect = atof(Prop);
+        arch->bin_grids.Aspect = atof(Prop);
         ezxml_set_attr(Node, "auto", NULL);
     }
 }
@@ -1465,6 +1465,9 @@ void XmlReadArch(IN const char* ArchFile,
     Next = FindElement(Cur, "segmentlist", TRUE);
     ProcessSegments(Next, &(arch->Segments), &(arch->num_segments),
                     arch->Switches, arch->num_switches, timing_enabled);
+
+    printf("arch->num_switches = %d.\n", arch->num_segments);
+
     FreeNode(Next);
 
     /* Release the full XML tree */
@@ -1548,6 +1551,7 @@ static void ProcessSegments(INOUT ezxml_t Parent,
 
         /* Get the wire and opin switches, or mux switch if unidir */
         if (UNI_DIRECTIONAL == (*Segs)[i].directionality) {
+            printf("Segment was UNI_DIRECTIONAL.\n");
             SubElem = FindElement(Node, "mux", TRUE);
             tmp = FindProperty(SubElem, "name", TRUE);
 
@@ -1573,6 +1577,7 @@ static void ProcessSegments(INOUT ezxml_t Parent,
             (*Segs)[i].opin_switch = j;
         } else {
             assert(BI_DIRECTIONAL == (*Segs)[i].directionality);
+            printf("segment was BI_DIRECTIONAL.\n");
             SubElem = FindElement(Node, "wire_switch", TRUE);
             tmp = FindProperty(SubElem, "name", TRUE);
 

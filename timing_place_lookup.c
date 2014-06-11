@@ -321,9 +321,9 @@ static void load_simplified_device(void)
     IO_TYPE = &dummy_type_descriptors[1];
     CLB_TYPE = &dummy_type_descriptors[2];
 
-    /* Fill in homogeneous core clb_grids info */
-    grid_backup = clb_grids;
-    clb_grids = (grid_tile_t**)alloc_matrix(0, num_grid_columns + 1,
+    /* Fill in homogeneous core bin_grids info */
+    grid_backup = bin_grids;
+    bin_grids = (grid_tile_t**)alloc_matrix(0, num_grid_columns + 1,
                                             0, num_grid_rows + 1,
                                             sizeof(grid_tile_t));
     int i, j;
@@ -333,16 +333,16 @@ static void load_simplified_device(void)
                     (i == num_grid_columns + 1 && j == 0) ||
                     (i == 0 && j == num_grid_rows + 1) || (i == num_grid_columns + 1
                                                          && j == num_grid_rows + 1)) {
-                clb_grids[i][j].grid_type = EMPTY_TYPE;
+                bin_grids[i][j].grid_type = EMPTY_TYPE;
             } else if (i == 0 || i == num_grid_columns + 1 || j == 0 || j == num_grid_rows + 1) {
-                clb_grids[i][j].grid_type = IO_TYPE;
+                bin_grids[i][j].grid_type = IO_TYPE;
             } else {
-                clb_grids[i][j].grid_type = CLB_TYPE;
+                bin_grids[i][j].grid_type = CLB_TYPE;
             }
 
-            clb_grids[i][j].in_blocks =
-                (int*)my_malloc(clb_grids[i][j].grid_type->capacity * sizeof(int));
-            clb_grids[i][j].m_offset = 0;
+            bin_grids[i][j].in_blocks =
+                (int*)my_malloc(bin_grids[i][j].grid_type->capacity * sizeof(int));
+            bin_grids[i][j].m_offset = 0;
         }
     }
 }
@@ -360,12 +360,12 @@ static void restore_original_device(void)
     int i, j;
     for (i = 0; i < num_grid_columns + 2; ++i) {
         for (j = 0; j < num_grid_rows + 2; ++j) {
-            free(clb_grids[i][j].in_blocks);
+            free(bin_grids[i][j].in_blocks);
         }
     }
 
-    free_matrix(clb_grids, 0, num_grid_columns + 1, 0, sizeof(grid_tile_t));
-    clb_grids = grid_backup;
+    free_matrix(bin_grids, 0, num_grid_columns + 1, 0, sizeof(grid_tile_t));
+    bin_grids = grid_backup;
 }
 
 /**************************************/
@@ -374,10 +374,10 @@ static void reset_placement(void)
     int i, j, k;
     for (i = 0; i <= num_grid_columns + 1; i++) {
         for (j = 0; j <= num_grid_rows + 1; j++) {
-            clb_grids[i][j].m_usage = 0;
+            bin_grids[i][j].m_usage = 0;
 
-            for (k = 0; k < clb_grids[i][j].grid_type->capacity; k++) {
-                clb_grids[i][j].in_blocks[k] = EMPTY;
+            for (k = 0; k < bin_grids[i][j].grid_type->capacity; k++) {
+                bin_grids[i][j].in_blocks[k] = EMPTY;
             }
         }
     }
@@ -512,8 +512,8 @@ static void alloc_routing_structs(router_opts_t router_opts,
     }
 
     build_rr_graph(graph_type, num_types, dummy_type_descriptors, num_grid_columns,
-                   //             num_grid_rows, clb_grids, chan_width_x[0], NULL,
-                   num_grid_rows, clb_grids,    16          , NULL,
+                   //             num_grid_rows, bin_grids, chan_width_x[0], NULL,
+                   num_grid_rows, bin_grids,    16          , NULL,
                    det_routing_arch.switch_block_type,
                    det_routing_arch.Fs, det_routing_arch.num_segment, det_routing_arch.num_switch,
                    segment_inf, det_routing_arch.global_route_switch,
@@ -569,16 +569,16 @@ static void assign_locations(block_type_ptr source_type,
     blocks[SINK_BLOCK].y = sink_y_loc;
     blocks[SINK_BLOCK].z = sink_z_loc;
 
-    clb_grids[source_x_loc][source_y_loc].in_blocks[source_z_loc] = SOURCE_BLOCK;
-    clb_grids[sink_x_loc][sink_y_loc].in_blocks[sink_z_loc] = SINK_BLOCK;
+    bin_grids[source_x_loc][source_y_loc].in_blocks[source_z_loc] = SOURCE_BLOCK;
+    bin_grids[sink_x_loc][sink_y_loc].in_blocks[sink_z_loc] = SINK_BLOCK;
 
     net[NET_USED].node_block_pins[NET_USED_SOURCE_BLOCK] =
         get_first_pin(DRIVER, blocks[SOURCE_BLOCK].block_type);
     net[NET_USED].node_block_pins[NET_USED_SINK_BLOCK] =
         get_first_pin(RECEIVER, blocks[SINK_BLOCK].block_type);
 
-    clb_grids[source_x_loc][source_y_loc].m_usage += 1;
-    clb_grids[sink_x_loc][sink_y_loc].m_usage += 1;
+    bin_grids[source_x_loc][source_y_loc].m_usage += 1;
+    bin_grids[sink_x_loc][sink_y_loc].m_usage += 1;
 
 }
 
@@ -629,10 +629,10 @@ static double assign_blocks_and_route_net(block_type_ptr source_type,
 
     double net_delay_value = net_delay[NET_USED][NET_USED_SINK_BLOCK];
 
-    clb_grids[source_x_loc][source_y_loc].m_usage = 0;
-    clb_grids[source_x_loc][source_y_loc].in_blocks[source_z_loc] = EMPTY;
-    clb_grids[sink_x_loc][sink_y_loc].m_usage = 0;
-    clb_grids[sink_x_loc][sink_y_loc].in_blocks[sink_z_loc] = EMPTY;
+    bin_grids[source_x_loc][source_y_loc].m_usage = 0;
+    bin_grids[source_x_loc][source_y_loc].in_blocks[source_z_loc] = EMPTY;
+    bin_grids[sink_x_loc][sink_y_loc].m_usage = 0;
+    bin_grids[sink_x_loc][sink_y_loc].in_blocks[sink_z_loc] = EMPTY;
 
     return (net_delay_value);
 }

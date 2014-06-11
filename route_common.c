@@ -256,7 +256,7 @@ try_route(int width_fac,
     free_rr_graph();
     /* Set up the routing resource graph defined by this FPGA architecture. */
     build_rr_graph(graph_type,
-                   num_types, type_descriptors, num_grid_columns, num_grid_rows, clb_grids,
+                   num_types, type_descriptors, num_grid_columns, num_grid_rows, bin_grids,
                    chan_width_x[0], NULL,
                    det_routing_arch.switch_block_type, det_routing_arch.Fs,
                    det_routing_arch.num_segment, det_routing_arch.num_switch, segment_inf,
@@ -1180,7 +1180,7 @@ void print_route(char* route_file)
                 switch (rr_type) {
                     case IPIN:
                     case OPIN:
-                        if (clb_grids[ilow][jlow].grid_type == IO_TYPE) {
+                        if (bin_grids[ilow][jlow].grid_type == IO_TYPE) {
                             fprintf(fp, " Pad: ");
                         } else {
                             /* IO Pad. */
@@ -1196,7 +1196,7 @@ void print_route(char* route_file)
 
                     case SOURCE:
                     case SINK:
-                        if (clb_grids[ilow][jlow].grid_type == IO_TYPE) {
+                        if (bin_grids[ilow][jlow].grid_type == IO_TYPE) {
                             fprintf(fp, " Pad: ");
                         } else {
                             /* IO Pad. */

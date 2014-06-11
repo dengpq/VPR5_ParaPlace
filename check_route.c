@@ -187,11 +187,11 @@ static void check_sink(int inode,
 
     int i = rr_node[inode].xlow;
     int j = rr_node[inode].ylow;
-    block_type_ptr type = clb_grids[i][j].grid_type;
+    block_type_ptr type = bin_grids[i][j].grid_type;
 
     int ipin, block_num, iclass, node_block_pin, iblk;
     for (iblk = 0; iblk < type->capacity; ++iblk) {
-        block_num = clb_grids[i][j].in_blocks[iblk]; /* Hardcoded to one block */
+        block_num = bin_grids[i][j].in_blocks[iblk]; /* Hardcoded to one block */
 
         const int knum_net_pins = net[inet].num_net_pins;
         for (ipin = 1; ipin < knum_net_pins + 1; ++ipin) {
@@ -247,7 +247,7 @@ check_source(int inode,
     j = rr_node[inode].ylow;
     ptc_num = rr_node[inode].ptc_num;   /* for sinks and sources, ptc_num is class */
     block_num = net[inet].node_blocks[0]; /* First node_block for net is the source */
-    block_type_ptr type = clb_grids[i][j].grid_type;
+    block_type_ptr type = bin_grids[i][j].grid_type;
 
     if (blocks[block_num].x != i || blocks[block_num].y != j) {
         printf
@@ -370,8 +370,8 @@ check_adjacent(int from_node,
 
             if (from_xlow == to_xlow && from_ylow == to_ylow
                     && from_xhigh == to_xhigh && from_yhigh == to_yhigh) {
-                from_grid_type = clb_grids[from_xlow][from_ylow].grid_type;
-                to_grid_type = clb_grids[to_xlow][to_ylow].grid_type;
+                from_grid_type = bin_grids[from_xlow][from_ylow].grid_type;
+                to_grid_type = bin_grids[to_xlow][to_ylow].grid_type;
                 assert(from_grid_type == to_grid_type);
                 iclass = to_grid_type->pin_class[to_ptc];
 
@@ -396,8 +396,8 @@ check_adjacent(int from_node,
 
             if (from_xlow == to_xlow && from_ylow == to_ylow
                     && from_xhigh == to_xhigh && from_yhigh == to_yhigh) {
-                from_grid_type = clb_grids[from_xlow][from_ylow].grid_type;
-                to_grid_type = clb_grids[to_xlow][to_ylow].grid_type;
+                from_grid_type = bin_grids[from_xlow][from_ylow].grid_type;
+                to_grid_type = bin_grids[to_xlow][to_ylow].grid_type;
                 assert(from_grid_type == to_grid_type);
                 iclass = from_grid_type->pin_class[from_ptc];
 
@@ -534,7 +534,7 @@ pin_and_chan_adjacent(int pin_node,
     int pin_ylow = rr_node[pin_node].ylow;
     int pin_xhigh = rr_node[pin_node].xhigh;
     int pin_yhigh = rr_node[pin_node].yhigh;
-    block_type_ptr pin_grid_type = clb_grids[pin_xlow][pin_ylow].grid_type;
+    block_type_ptr pin_grid_type = bin_grids[pin_xlow][pin_ylow].grid_type;
 
     int pin_ptc = rr_node[pin_node].ptc_num;
     int chan_xlow = rr_node[chan_node].xlow;

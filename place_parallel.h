@@ -71,8 +71,8 @@ typedef struct pthread_data {
     double** net_slack;
     double** net_delay;
     double* crit_exponent;
-    int* exit;
     double* range_limit;
+    int*    exit;
 } __attribute__((aligned(64))) pthread_data_t;
 
 

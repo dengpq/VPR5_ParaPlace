@@ -89,7 +89,7 @@ int* chan_width_x = NULL;   /* [0..num_grid_rows] */
 int* chan_width_y = NULL;   /* [0..num_grid_columns] */
 
 /* [0..(num_grid_columns+1)][0..(num_grid_rows+1)] Physical block list */
-grid_tile_t** clb_grids = NULL;
+grid_tile_t** bin_grids = NULL;
 
 
 /******** Structures defining the routing ********/

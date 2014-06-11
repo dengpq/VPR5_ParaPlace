@@ -51,7 +51,7 @@ enum cost_methods {
 
 
 /* Partitioning parameter.
- * The clb_grids will be partitioned into x_partition rows *
+ * The bin_grids will be partitioned into x_partition rows *
  * and y_partition columns.                *
  * Feel free to change the numbers below.  *
  * For 8-threads, I'd like to set 4x2 regions. *
@@ -594,7 +594,8 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
     double crit_exponent = 0.0;
     double max_delay = 0.0;
     double place_delay_value = 0.0;
-    double timing_cost, delay_cost;
+    double timing_cost = 0.0;
+    double delay_cost = 0.0;
     double  inverse_prev_bb_cost = 0.0;
     double inverse_prev_timing_cost = 0.0;
     double cost = 0.0;
@@ -740,10 +741,12 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
     const int extra_rows =
                 (num_grid_rows + 2) - rows_assign_to_thread * verti_regions;
 
-    int success_sum, exit;
-    double success_rat;
+    int success_sum = 0;
+    double success_rat = 0.0;
     double av_cost, av_bb_cost, av_timing_cost, av_delay_cost, sum_of_squares;
-    double std_dev;
+    av_cost = av_bb_cost = av_timing_cost = av_delay_cost = sum_of_squares = 0.0;
+    double std_dev = 0.0;
+    int exit = 0;
 
     pthread_data_t thread_data_array[NUM_OF_THREADS];
     pthread_t place_threads[NUM_OF_THREADS];
@@ -843,8 +846,8 @@ void try_place_use_multi_threads(placer_opts_t      placer_opts,
         thread_data_array[thd_id].num_connections = &num_connections;
 
         thread_data_array[thd_id].crit_exponent = &crit_exponent;
-        thread_data_array[thd_id].exit = &exit;
         thread_data_array[thd_id].range_limit = &range_limit;
+        thread_data_array[thd_id].exit = &exit;
 
         assert(thread_data_array[thd_id].y_end > thread_data_array[thd_id].y_start);
 
@@ -1169,7 +1172,7 @@ static void* try_place_parallel(pthread_data_t* input_args)
             }
 
             barrier_polling(kthread_id);
-            /* Iterate through each sub-regions of the clb_grids. FIXME, each region
+            /* Iterate through each sub-regions of the bin_grids. FIXME, each region
              * had 2x2 sub-regions. */
             int row, col;
             for (row = 0; row < 2; ++row) {
@@ -1321,12 +1324,13 @@ static void  try_place_a_subregion(const int  kthread_id,
     for (x_from = hori_start_bound; x_from < hori_end_bound; ++x_from) {
         for (y_from = vert_start_bound; y_from < vert_end_bound; ++y_from) {
             if ((local_grid[x_from][y_from].grid_type == EMPTY_TYPE)
-                  || (kfixed_pins && local_grid[x_from][y_from].grid_type == IO_TYPE)) {
+                  || (kfixed_pins && local_grid[x_from][y_from].grid_type
+                        == IO_TYPE)) {
                 continue;
             }
             const int kcapacity = local_grid[x_from][y_from].grid_type->capacity;
             for (z_from = 0; z_from < kcapacity; ++z_from) {
-                /* do not consider empty locations, ie - four corners of the clb_grids
+                /* do not consider empty locations, ie - four corners of the bin_grids
                  * or fixed pins  */
                 if (local_grid[x_from][y_from].in_blocks[z_from] == EMPTY) {
                     continue;
@@ -1529,15 +1533,15 @@ static void initial_swap_data(thread_local_common_paras_t*  common_paras_ptr,
         }
         /* Why not set y as Extend-SubRegion[region_y_boundary-2..region_y_boundary+2] */
         for (y = 0; y <= (num_grid_rows + 1); ++y) {
-            local_grid[x][y].grid_type = clb_grids[x][y].grid_type;
-            local_grid[x][y].m_usage = clb_grids[x][y].m_usage;
-            local_grid[x][y].m_offset = clb_grids[x][y].m_offset;
+            local_grid[x][y].grid_type = bin_grids[x][y].grid_type;
+            local_grid[x][y].m_usage = bin_grids[x][y].m_usage;
+            local_grid[x][y].m_offset = bin_grids[x][y].m_offset;
 
-            local_grid[x][y].in_blocks =
-              (int*)my_malloc(sizeof(int) * clb_grids[x][y].grid_type->capacity);
-
-            for (z = 0; z < clb_grids[x][y].grid_type->capacity; ++z) {
-                local_grid[x][y].in_blocks[z] = clb_grids[x][y].in_blocks[z];
+            const int kbin_capacity = bin_grids[x][y].grid_type->capacity;
+            local_grid[x][y].in_blocks = (int*)my_malloc(sizeof(int) *
+                                                           kbin_capacity);
+            for (z = 0; z < kbin_capacity; ++z) {
+                local_grid[x][y].in_blocks[z] = bin_grids[x][y].in_blocks[z];
             }
         }
     }
@@ -1657,24 +1661,25 @@ static void find_fanin_parallel(const int kthread_id)
 
 static void initial_localvert_grid()
 {
-    /* clb_grids[col][row] was column-based, but localvert_grid[col][row] was
-     * row-based, it vertical to clb_grids. */
+    /* bin_grids[col][row] was column-based, but localvert_grid[col][row] was
+     * row-based, it vertical to bin_grids. */
     localvert_grid = (grid_tile_t**)alloc_matrix(0, (num_grid_columns + 1),
                                                  0, (num_grid_rows + 1),
                                                  sizeof(grid_tile_t));
     int col, row, cap;
     for (col = 0; col < (num_grid_columns + 2); ++col) {
         for (row = 0; row < (num_grid_rows + 2); ++row) {
-            localvert_grid[row][col].grid_type = clb_grids[col][row].grid_type;
-            localvert_grid[row][col].m_usage = clb_grids[col][row].m_usage;
-            localvert_grid[row][col].m_offset = clb_grids[col][row].m_offset;
+            localvert_grid[row][col].grid_type = bin_grids[col][row].grid_type;
+            localvert_grid[row][col].m_usage = bin_grids[col][row].m_usage;
+            localvert_grid[row][col].m_offset = bin_grids[col][row].m_offset;
 
+            const int kbin_capacity = bin_grids[col][row].grid_type->capacity;
             localvert_grid[row][col].in_blocks = (int*)my_malloc(sizeof(int) *
-                                  clb_grids[col][row].grid_type->capacity);
+                                                                 kbin_capacity);
 
-            for (cap = 0; cap < clb_grids[col][row].grid_type->capacity; ++cap) {
+            for (cap = 0; cap < kbin_capacity; ++cap) {
                 localvert_grid[row][col].in_blocks[cap] =
-                        clb_grids[col][row].in_blocks[cap];
+                        bin_grids[col][row].in_blocks[cap];
             }
         }
     }
@@ -1918,7 +1923,7 @@ static void update_from_global_to_local_grid(const int kiter,
                                              thread_local_common_paras_t*  common_paras_ptr,
                                              thread_local_data_for_swap_t* swap_data_ptr)
 {
-    /* Regions in first row of the region clb_grids */
+    /* Regions in first row of the region bin_grids */
     const int  kthread_id = common_paras_ptr->local_thread_id;
     const int* kregion_x_boundary = common_paras_ptr->local_region_x_boundary;
     const int* kregion_y_boundary = common_paras_ptr->local_region_y_boundary;
@@ -1956,7 +1961,7 @@ static void update_from_global_to_local_grid(const int kiter,
                                                   num_grid_rows + 2));
     }
 
-    /* global clb_grids to local blocks clb_grids update */
+    /* global bin_grids to local blocks bin_grids update */
     int x = -1;
     local_block_t* local_block = swap_data_ptr->m_local_block;
     for (x = 0; x < num_blocks; ++x) {
@@ -2002,7 +2007,7 @@ static void update_local_data_from_global(const int* region_x_boundary,
                                           const int krow,
                                           const int kcol)
 {
-    /* update local clb_grids information, first was horizontal direction,
+    /* update local bin_grids information, first was horizontal direction,
      * then was vertical direction. */
     if (krow == 0 && kcol == 0) {
         /* update top of the strip(horizontal direction) */
@@ -2151,14 +2156,12 @@ static int find_affected_nets_parallel(int* nets_to_update,
                     }
                 }
 
-#ifdef DEBUG
                 if (count > affected_index) {
                     printf("Error in find_affected_nets -- count = %d,"
                      " affected index = %d.\n", count,
                      affected_index);
                     exit(1);
                 }
-#endif
             } else {
                 /* Net not marked yet. */
                 nets_to_update[affected_index] = inet;
@@ -2283,7 +2286,9 @@ static boolean find_to_block_parallel(int x_from,
                 exit(-1);
             }
 
-            assert(type == clb_grids[*x_to][*y_to].grid_type);
+            assert((*x_to >= 0 || *x_to <= num_grid_columns + 1)
+                      && (*y_to >= 0 || *y_to <= num_grid_rows + 1));
+            assert(type == bin_grids[*x_to][*y_to].grid_type);
         } else {
             /* For other types except IO_TYPES */
             /* generate a {x_offset, y_offset} pairs that between (xmin, xmax) *
@@ -2305,7 +2310,7 @@ static boolean find_to_block_parallel(int x_from,
         }
     } while ((x_from == *x_to) && (y_from == *y_to));
 
-    assert(type == clb_grids[*x_to][*y_to].grid_type);
+    assert(type == bin_grids[*x_to][*y_to].grid_type);
     return TRUE;
 }  /* end of static boolean find_to_block_parallel(int x_from,) */
 
@@ -3218,10 +3223,10 @@ static void update_from_local_to_global(local_block_t* local_block,
                     localvert_grid[y][x].m_usage = local_grid[x][y].m_usage;
                 }
 
-                clb_grids[x][y].m_usage = local_grid[x][y].m_usage;
-                for (z = 0; z < clb_grids[x][y].grid_type->capacity; ++z) {
+                bin_grids[x][y].m_usage = local_grid[x][y].m_usage;
+                for (z = 0; z < bin_grids[x][y].grid_type->capacity; ++z) {
                     if (local_grid[x][y].in_blocks[z] !=
-                            clb_grids[x][y].in_blocks[z]) {
+                            bin_grids[x][y].in_blocks[z]) {
                         /*blocks has been moved*/
                         block_moved = local_grid[x][y].in_blocks[z];
 
@@ -3230,7 +3235,7 @@ static void update_from_local_to_global(local_block_t* local_block,
                             localvert_grid[y][x].in_blocks[z] = block_moved;
                         }
 
-                        clb_grids[x][y].in_blocks[z] = block_moved;
+                        bin_grids[x][y].in_blocks[z] = block_moved;
 
                         /*if the location becomes empty, don't worry about the rest*/
                         if (block_moved == -1) {
@@ -3240,8 +3245,8 @@ static void update_from_local_to_global(local_block_t* local_block,
                         blocks[block_moved].x = local_block[block_moved].x;
                         blocks[block_moved].y = local_block[block_moved].y;
                         blocks[block_moved].z = local_block[block_moved].z;
-                    } /* end of if(local_grid[x][y].blocks[z] != clb_grids[x][y].blocks[z]) */
-                } /* end of for(z = 0; z < clb_grids[x][y].type->capacity; ++z) */
+                    } /* end of if(local_grid[x][y].blocks[z] != bin_grids[x][y].blocks[z]) */
+                } /* end of for(z = 0; z < bin_grids[x][y].type->capacity; ++z) */
             } /* end of if(local_grid[x][y].type != EMPTY_TYPE) */
         } /* end of for(y = y_start; y < y_end; ++y) */
     } /* end of for(x = x_start; x < x_end; ++x) */
@@ -3255,14 +3260,14 @@ static void update_from_global_to_local_hori(local_block_t* local_block,
     int x, y, z, block_moved;
     for (x = x_start; x < x_end; ++x) {
         for (y = y_start; y < y_end; ++y) {
-            if (clb_grids[x][y].grid_type != EMPTY_TYPE) {
-                local_grid[x][y].m_usage = clb_grids[x][y].m_usage;
+            if (bin_grids[x][y].grid_type != EMPTY_TYPE) {
+                local_grid[x][y].m_usage = bin_grids[x][y].m_usage;
 
-                for (z = 0; z < clb_grids[x][y].grid_type->capacity; ++z) {
-                    if (clb_grids[x][y].in_blocks[z]
+                for (z = 0; z < bin_grids[x][y].grid_type->capacity; ++z) {
+                    if (bin_grids[x][y].in_blocks[z]
                             != local_grid[x][y].in_blocks[z]) {
                         //blocks has been moved
-                        block_moved = clb_grids[x][y].in_blocks[z];
+                        block_moved = bin_grids[x][y].in_blocks[z];
                         local_grid[x][y].in_blocks[z] = block_moved;
 
                         if (block_moved == -1) {
@@ -3290,7 +3295,10 @@ static void update_from_global_to_local_vert(local_block_t* local_block,
             if (localvert_grid[y][x].grid_type != EMPTY_TYPE) {
                 local_grid[x][y].m_usage = localvert_grid[y][x].m_usage;
 
-                for (z = 0; z < localvert_grid[y][x].grid_type->capacity; ++z) {
+                const int kgrid_capacity = localvert_grid[y][x].grid_type->capacity;
+                printf("grid[%d][%d] capacity = %d.\n", y, x, kgrid_capacity);
+
+                for (z = 0; z < kgrid_capacity; ++z) {
                     if (localvert_grid[y][x].in_blocks[z] !=
                             local_grid[x][y].in_blocks[z]) {
                         //blocks has been moved
@@ -3320,14 +3328,14 @@ static void update_from_global_to_local_grid_only(grid_tile_t** local_grid,
     int x, y, z;
     for (x = x_start; x < x_end; ++x) {
         for (y = y_start; y < y_end; ++y) {
-            if (clb_grids[x][y].grid_type != EMPTY_TYPE) {
-                local_grid[x][y].m_usage = clb_grids[x][y].m_usage;
+            if (bin_grids[x][y].grid_type != EMPTY_TYPE) {
+                local_grid[x][y].m_usage = bin_grids[x][y].m_usage;
 
-                for (z = 0; z < clb_grids[x][y].grid_type->capacity; ++z) {
-                    if (clb_grids[x][y].in_blocks[z] !=
+                for (z = 0; z < bin_grids[x][y].grid_type->capacity; ++z) {
+                    if (bin_grids[x][y].in_blocks[z] !=
                             local_grid[x][y].in_blocks[z]) {
                         //blocks has been moved
-                        local_grid[x][y].in_blocks[z] = clb_grids[x][y].in_blocks[z];
+                        local_grid[x][y].in_blocks[z] = bin_grids[x][y].in_blocks[z];
                     }
                 }
             }
@@ -3358,13 +3366,13 @@ static void print_grid(void)
     int row = 0;
     for (col = 0; col <= num_grid_columns + 1; ++col) {
         for (row = 0; row <= num_grid_rows + 1; ++row) {
-            grid_tile_t grid_tile = clb_grids[col][row];
+            grid_tile_t grid_tile = bin_grids[col][row];
             const char* grid_name = grid_tile.grid_type->name;
             const int  grid_capacity = grid_tile.grid_type->capacity;
             const int  grid_height = grid_tile.grid_type->height;
             const int  grid_max_sblks = grid_tile.grid_type->max_subblocks;
             const int  grid_usage = grid_tile.m_usage;
-            fprintf(print_grid_ptr, "clb_grids[%d][%d] is: %s, capacity: %d, height: %d, max_sblks: %d, usage: %d.\n",
+            fprintf(print_grid_ptr, "bin_grids[%d][%d] is: %s, capacity: %d, height: %d, max_sblks: %d, usage: %d.\n",
                     col, row, grid_name, grid_capacity, grid_height,
                     grid_max_sblks, grid_usage);
         }
@@ -3521,7 +3529,7 @@ static int count_connections()
     int count = 0;
     int inet = -1;
     for (inet = 0; inet < num_nets; ++inet) {
-        if (net[inet].is_global) {
+        if (net[inet].is_global == TRUE) {
             continue;
         }
         count += net[inet].num_net_pins;
@@ -3547,7 +3555,7 @@ static void compute_net_pin_index_values(void)
     int inet = -1;
     int netpin = -1;
     for (inet = 0; inet < num_nets; ++inet) {
-        if (net[inet].is_global) {
+        if (net[inet].is_global == TRUE) {
             continue;
         }
 
@@ -3765,12 +3773,12 @@ static int try_swap(double t,
      * until success of move is determined.)                       */
     int z_from = blocks[from_block].z;
     int z_to = 0;
-    if (clb_grids[x_to][y_to].grid_type->capacity > 1) {
-        z_to = my_irand(clb_grids[x_to][y_to].grid_type->capacity - 1);
+    if (bin_grids[x_to][y_to].grid_type->capacity > 1) {
+        z_to = my_irand(bin_grids[x_to][y_to].grid_type->capacity - 1);
     }
 
     int to_block = EMPTY;
-    if (clb_grids[x_to][y_to].in_blocks[z_to] == EMPTY) {
+    if (bin_grids[x_to][y_to].in_blocks[z_to] == EMPTY) {
         /* Moving to an empty location */
         to_block = EMPTY;
         blocks[from_block].x = x_to;
@@ -3778,7 +3786,7 @@ static int try_swap(double t,
         blocks[from_block].z = z_to;
     } else {
         /* Swapping two blocks */
-        to_block = clb_grids[x_to][y_to].in_blocks[z_to];
+        to_block = bin_grids[x_to][y_to].in_blocks[z_to];
         blocks[to_block].x = x_from;
         blocks[to_block].y = y_from;
         blocks[to_block].z = z_from;
@@ -3911,13 +3919,13 @@ static int try_swap(double t,
 
         /* Update fb data structures since we kept the move. */
         /* Swap physical location */
-        clb_grids[x_to][y_to].in_blocks[z_to] = from_block;
-        clb_grids[x_from][y_from].in_blocks[z_from] = to_block;
+        bin_grids[x_to][y_to].in_blocks[z_to] = from_block;
+        bin_grids[x_from][y_from].in_blocks[z_from] = to_block;
 
         if (EMPTY == to_block) {
             /* Moved to an empty location */
-            ++(clb_grids[x_to][y_to].m_usage);
-            --(clb_grids[x_from][y_from].m_usage);
+            ++(bin_grids[x_to][y_to].m_usage);
+            --(bin_grids[x_from][y_from].m_usage);
         }
     } else {
         /* Move was rejected.  */
@@ -4088,7 +4096,7 @@ static boolean find_to(int x_from,
     int j = 0;
     if (type != IO_TYPE) {
         for (i = min_x; i <= max_x; ++i) {
-            if (clb_grids[i][1].grid_type == type) {
+            if (bin_grids[i][1].grid_type == type) {
                 ++num_col_same_type;
                 x_lookup[j] = i;
                 ++j;
@@ -4216,7 +4224,7 @@ static boolean find_to(int x_from,
             y_rel = my_irand(max(0, ((max_y - min_y) / type->height) - 1));
             *x_to = x_lookup[x_rel];
             *y_to = min_y + y_rel * type->height;
-            *y_to = (*y_to) - clb_grids[*x_to][*y_to].m_offset; /* align it */
+            *y_to = (*y_to) - bin_grids[*x_to][*y_to].m_offset; /* align it */
             assert(*x_to >= 1 && *x_to <= num_grid_columns);
             assert(*y_to >= 1 && *y_to <= num_grid_rows);
         }
@@ -4230,7 +4238,7 @@ static boolean find_to(int x_from,
         exit(1);
     }
 #endif
-    assert(type == clb_grids[*x_to][*y_to].grid_type);
+    assert(type == bin_grids[*x_to][*y_to].grid_type);
     return TRUE;
 }
 
@@ -5318,12 +5326,10 @@ get_net_wirelength_estimate(int inet,
 }
 
 
+/* Finds the cost due to one net by looking at its coordinate bounding-box. */
 static double get_net_cost(int inet,
                           bbox_t* bbox_ptr)
 {
-    /* Finds the cost due to one net by looking at its coordinate bounding  *
-     * box.                                                                 */
-
     /* Get the expected "crossing count" of a net, based on its number *
      * of pins.  Extrapolate for very large nets.                      */
     double crossing = 0.0;
@@ -5345,6 +5351,12 @@ static double get_net_cost(int inet,
     const int xmax = bbox_ptr->xmax;
     const int ymin = bbox_ptr->ymin;
     const int ymax = bbox_ptr->ymax;
+
+    assert((xmin >= 0 && xmin <= num_grid_columns + 1) && (xmax >= 0 &&
+              xmax <= num_grid_columns + 1));
+    assert((ymin >= 0 && ymin <= num_grid_rows + 1) && (ymax >= 0 &&
+              ymax <= num_grid_rows + 1));
+
     double net_cost = (xmax - xmin + 1) * crossing * chanx_place_cost_fac[ymax][ymin-1];
     net_cost += (ymax - ymin + 1) * crossing * chany_place_cost_fac[xmax][xmin-1];
 
@@ -5599,12 +5611,12 @@ static void initial_placement(pad_loc_t pad_loc_type,
     int i, j, k, iblk;
     for (i = 0; i <= num_grid_columns + 1; ++i) {
         for (j = 0; j <= num_grid_rows + 1; ++j) {
-            clb_grids[i][j].m_usage = 0;
+            bin_grids[i][j].m_usage = 0;
 
-            for (k = 0; k < clb_grids[i][j].grid_type->capacity; ++k) {
-                clb_grids[i][j].in_blocks[k] = EMPTY;
-                if (clb_grids[i][j].m_offset == 0) {
-                    ++avail_diff_type_grids[clb_grids[i][j].grid_type->index];
+            for (k = 0; k < bin_grids[i][j].grid_type->capacity; ++k) {
+                bin_grids[i][j].in_blocks[k] = EMPTY;
+                if (bin_grids[i][j].m_offset == 0) {
+                    ++avail_diff_type_grids[bin_grids[i][j].grid_type->index];
                 }
             }
         }
@@ -5618,9 +5630,9 @@ static void initial_placement(pad_loc_t pad_loc_type,
     int* index = (int*)my_calloc(num_types, sizeof(int));
     for (i = 0; i <= num_grid_columns + 1; ++i) {
         for (j = 0; j <= num_grid_rows + 1; ++j) {
-            for (k = 0; k < clb_grids[i][j].grid_type->capacity; ++k) {
-                if (clb_grids[i][j].m_offset == 0) {
-                    int type_index = clb_grids[i][j].grid_type->index;
+            for (k = 0; k < bin_grids[i][j].grid_type->capacity; ++k) {
+                if (bin_grids[i][j].m_offset == 0) {
+                    int type_index = bin_grids[i][j].grid_type->index;
                     pos[type_index][index[type_index]].x = i;
                     pos[type_index][index[type_index]].y = j;
                     pos[type_index][index[type_index]].z = k;
@@ -5641,8 +5653,8 @@ static void initial_placement(pad_loc_t pad_loc_type,
             int x = pos[type_index][choice].x;
             int y = pos[type_index][choice].y;
             int z = pos[type_index][choice].z;
-            clb_grids[x][y].in_blocks[z] = iblk;
-            ++clb_grids[x][y].m_usage;
+            bin_grids[x][y].in_blocks[z] = iblk;
+            ++bin_grids[x][y].m_usage;
 
             /* Ensure randomizer doesn't pick this blocks again */
             /* overwrite used blocks position */
@@ -5660,10 +5672,10 @@ static void initial_placement(pad_loc_t pad_loc_type,
      * clb array.                                                             */
     for (i = 0; i <= (num_grid_columns + 1); ++i) {
         for (j = 0; j <= (num_grid_rows + 1); ++j) {
-            for (k = 0; k < clb_grids[i][j].grid_type->capacity; ++k) {
-                assert(clb_grids[i][j].in_blocks != NULL);
+            for (k = 0; k < bin_grids[i][j].grid_type->capacity; ++k) {
+                assert(bin_grids[i][j].in_blocks != NULL);
 
-                iblk = clb_grids[i][j].in_blocks[k];
+                iblk = bin_grids[i][j].in_blocks[k];
                 if (iblk != EMPTY) {
                     blocks[iblk].x = i;
                     blocks[iblk].y = j;
@@ -5844,33 +5856,33 @@ static double check_place(double bb_cost,
         bdone[i] = 0;
     }
 
-    /* Step through clb_grids array. Check it against blocks array. */
+    /* Step through bin_grids array. Check it against blocks array. */
     for (i = 0; i <= (num_grid_columns + 1); i++)
         for (j = 0; j <= (num_grid_rows + 1); j++) {
-            if (clb_grids[i][j].m_usage > clb_grids[i][j].grid_type->capacity) {
-                printf("Error:  blocks at clb_grids location (%d,%d) overused. "
-                       "Usage is %d\n", i, j, clb_grids[i][j].m_usage);
+            if (bin_grids[i][j].m_usage > bin_grids[i][j].grid_type->capacity) {
+                printf("Error:  blocks at bin_grids location (%d,%d) overused. "
+                       "Usage is %d\n", i, j, bin_grids[i][j].m_usage);
                 error++;
             }
 
             usage_check = 0;
 
-            for (k = 0; k < clb_grids[i][j].grid_type->capacity; k++) {
-                block_num = clb_grids[i][j].in_blocks[k];
+            for (k = 0; k < bin_grids[i][j].grid_type->capacity; k++) {
+                block_num = bin_grids[i][j].in_blocks[k];
                 if (EMPTY == block_num) {
                     continue;
                 }
 
-                if (blocks[block_num].block_type != clb_grids[i][j].grid_type) {
+                if (blocks[block_num].block_type != bin_grids[i][j].grid_type) {
                     printf
-                    ("Error:  blocks %d type does not match clb_grids location (%d,%d) type.\n",
+                    ("Error:  blocks %d type does not match bin_grids location (%d,%d) type.\n",
                      block_num, i, j);
                     error++;
                 }
 
                 if ((blocks[block_num].x != i) || (blocks[block_num].y != j)) {
                     printf
-                    ("Error:  blocks %d (%d,%d) location conflicts with clb_grids(%d,%d)"
+                    ("Error:  blocks %d (%d,%d) location conflicts with bin_grids(%d,%d)"
                      "data.\n", block_num, blocks[block_num].x, blocks[block_num].y, i, j);
                     error++;
                 }
@@ -5879,14 +5891,14 @@ static double check_place(double bb_cost,
                 bdone[block_num]++;
             }
 
-            if (usage_check != clb_grids[i][j].m_usage) {
+            if (usage_check != bin_grids[i][j].m_usage) {
                 printf
                 ("Error:  Location (%d,%d) usage is %d, but has actual usage %d.\n",
-                 i, j, clb_grids[i][j].m_usage, usage_check);
+                 i, j, bin_grids[i][j].m_usage, usage_check);
             }
         }
 
-    /* Check that every blocks exists in the clb_grids and blocks arrays somewhere. */
+    /* Check that every blocks exists in the bin_grids and blocks arrays somewhere. */
     for (i = 0; i < num_blocks; i++)
         if (bdone[i] != 1) {
             printf("Error:  block %d listed %d times in data structures.\n",

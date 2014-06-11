@@ -175,9 +175,9 @@ void read_user_pad_loc(char* pad_loc_file)
 
     for (i = 0; i <= num_grid_columns + 1; i++) {
         for (j = 0; j <= num_grid_rows + 1; j++) {
-            if (clb_grids[i][j].grid_type == IO_TYPE) {
+            if (bin_grids[i][j].grid_type == IO_TYPE) {
                 for (k = 0; k < IO_TYPE->capacity; k++) {
-                    clb_grids[i][j].in_blocks[k] = OPEN;    /* Flag for err. check */
+                    bin_grids[i][j].in_blocks[k] = OPEN;    /* Flag for err. check */
                 }
             }
         }
@@ -254,7 +254,7 @@ void read_user_pad_loc(char* pad_loc_file)
         blocks[block_num].x = i;  /* Will be reloaded by initial_placement anyway. */
         blocks[block_num].y = j;  /* I need to set .x only as a done flag.         */
 
-        if (clb_grids[i][j].grid_type != IO_TYPE) {
+        if (bin_grids[i][j].grid_type != IO_TYPE) {
             printf("Error:  attempt to place IO block %s in \n",
                    bname);
             printf("an illegal location (%d, %d).\n", i, j);
@@ -268,8 +268,8 @@ void read_user_pad_loc(char* pad_loc_file)
             exit(1);
         }
 
-        clb_grids[i][j].in_blocks[k] = block_num;
-        ++(clb_grids[i][j].m_usage);
+        bin_grids[i][j].in_blocks[k] = block_num;
+        ++(bin_grids[i][j].m_usage);
         ptr = my_fgets(buf, BUFSIZE, fp);
     }
 

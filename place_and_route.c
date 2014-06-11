@@ -98,7 +98,7 @@ void place_and_route(operation_types_t operation,
                             blocks,
                             num_grid_columns,
                             num_grid_rows,
-                            clb_grids);
+                            bin_grids);
     } else {
         assert((PLACE_ONCE == placer_opts.place_freq) ||
                (PLACE_ALWAYS == placer_opts.place_freq));
@@ -523,7 +523,7 @@ static int binary_search_place_and_route(placer_opts_t placer_opts,
     free_rr_graph();
 
     build_rr_graph(graph_type,
-                   num_types, type_descriptors, num_grid_columns, num_grid_rows, clb_grids,
+                   num_types, type_descriptors, num_grid_columns, num_grid_rows, bin_grids,
                    chan_width_x[0], NULL,
                    det_routing_arch.switch_block_type, det_routing_arch.Fs,
                    det_routing_arch.num_segment, det_routing_arch.num_switch, segment_inf,

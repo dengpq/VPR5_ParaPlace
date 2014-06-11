@@ -197,7 +197,7 @@ static boolean rr_node_is_global_clb_ipin(int inode)
     }
     /* Returns TRUE if inode refers to a global FB input pin node.   */
     block_type_ptr type =
-        clb_grids[rr_node[inode].xlow][rr_node[inode].ylow].grid_type;
+        bin_grids[rr_node[inode].xlow][rr_node[inode].ylow].grid_type;
 
 
     int ipin = rr_node[inode].ptc_num;
@@ -252,7 +252,7 @@ void check_node(int inode,
         case IPIN:
         case OPIN:
             /* This is used later as well */
-            type = clb_grids[xlow][ylow].grid_type;
+            type = bin_grids[xlow][ylow].grid_type;
 
             if (type == NULL) {
                 printf

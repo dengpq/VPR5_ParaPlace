@@ -153,16 +153,16 @@ InitArch(IN t_arch Arch)
         num_blocks_type[blocks[i].block_type->index]++;
     }
 
-    if (Arch.clb_grid.IsAuto) {
+    if (Arch.bin_grids.IsAuto) {
         /* Auto-size FPGA, perform a binary search */
         while (high == -1 || low < high) {
             /* Generate grid */
-            if (Arch.clb_grid.Aspect >= 1.0) {
+            if (Arch.bin_grids.Aspect >= 1.0) {
                 num_grid_rows = current;
-                num_grid_columns = nint(current * Arch.clb_grid.Aspect);
+                num_grid_columns = nint(current * Arch.bin_grids.Aspect);
             } else {
                 num_grid_columns = current;
-                num_grid_rows = nint(current / Arch.clb_grid.Aspect);
+                num_grid_rows = nint(current / Arch.bin_grids.Aspect);
             }
 
 #if DEBUG
@@ -207,19 +207,19 @@ InitArch(IN t_arch Arch)
         }
 
         /* Generate grid */
-        if (Arch.clb_grid.Aspect >= 1.0) {
+        if (Arch.bin_grids.Aspect >= 1.0) {
             num_grid_rows = current;
-            num_grid_columns = nint(current * Arch.clb_grid.Aspect);
+            num_grid_columns = nint(current * Arch.bin_grids.Aspect);
         } else {
             num_grid_columns = current;
-            num_grid_rows = nint(current / Arch.clb_grid.Aspect);
+            num_grid_rows = nint(current / Arch.bin_grids.Aspect);
         }
 
         alloc_and_load_grid(num_instances_type);
         printf("FPGA auto-sized to, x = %d y = %d\n", num_grid_columns, num_grid_rows);
     } else { /* Not auto initial */
-        num_grid_columns = Arch.clb_grid.W;
-        num_grid_rows = Arch.clb_grid.H;
+        num_grid_columns = Arch.bin_grids.W;
+        num_grid_rows = Arch.bin_grids.H;
         alloc_and_load_grid(num_instances_type);
     }
 
@@ -287,7 +287,7 @@ static void alloc_and_load_grid(INOUT int* num_instances_type)
     }
 
     assert(num_grid_columns >= 1 && num_grid_rows >= 1);
-    clb_grids = (grid_tile_t**)alloc_matrix(0, (num_grid_columns + 1),
+    bin_grids = (grid_tile_t**)alloc_matrix(0, (num_grid_columns + 1),
                                             0, (num_grid_rows + 1),
                                             sizeof(grid_tile_t));
 
@@ -295,7 +295,7 @@ static void alloc_and_load_grid(INOUT int* num_instances_type)
     int i, j;
     for (i = 0; i <= (num_grid_columns + 1); ++i) {
         for (j = 0; j <= (num_grid_rows + 1); ++j) {
-            memset(&clb_grids[i][j], 0, (sizeof(grid_tile_t)));
+            memset(&bin_grids[i][j], 0, (sizeof(grid_tile_t)));
         }
     }
 
@@ -304,37 +304,37 @@ static void alloc_and_load_grid(INOUT int* num_instances_type)
     }
 
     /* Nothing goes in the corners. */
-    clb_grids[0][0].grid_type = clb_grids[num_grid_columns + 1][0].grid_type = EMPTY_TYPE;
-    clb_grids[0][num_grid_rows + 1].grid_type =
-        clb_grids[num_grid_columns + 1][num_grid_rows + 1].grid_type = EMPTY_TYPE;
+    bin_grids[0][0].grid_type = bin_grids[num_grid_columns + 1][0].grid_type = EMPTY_TYPE;
+    bin_grids[0][num_grid_rows + 1].grid_type =
+        bin_grids[num_grid_columns + 1][num_grid_rows + 1].grid_type = EMPTY_TYPE;
     num_instances_type[EMPTY_TYPE->index] = 4;
 
     for (i = 1; i <= num_grid_columns; ++i) {
-        /* bottom clb_grids */
-        clb_grids[i][0].in_blocks = (int*)my_malloc(sizeof(int) * IO_TYPE->capacity);
-        clb_grids[i][0].grid_type = IO_TYPE;
+        /* bottom bin_grids */
+        bin_grids[i][0].in_blocks = (int*)my_malloc(sizeof(int) * IO_TYPE->capacity);
+        bin_grids[i][0].grid_type = IO_TYPE;
         /* top grids */
-        clb_grids[i][num_grid_rows + 1].in_blocks =
+        bin_grids[i][num_grid_rows + 1].in_blocks =
             (int*)my_malloc(sizeof(int) * IO_TYPE->capacity);
-        clb_grids[i][num_grid_rows + 1].grid_type = IO_TYPE;
+        bin_grids[i][num_grid_rows + 1].grid_type = IO_TYPE;
         /* all elements in in_blocks it must initial as -1 */
         for (j = 0; j < IO_TYPE->capacity; ++j) {
-            clb_grids[i][0].in_blocks[j] = EMPTY;
-            clb_grids[i][num_grid_rows + 1].in_blocks[j] = EMPTY;
+            bin_grids[i][0].in_blocks[j] = EMPTY;
+            bin_grids[i][num_grid_rows + 1].in_blocks[j] = EMPTY;
         }
     }
     /* both left and right side io pads */
     for (i = 1; i <= num_grid_rows; ++i) {
-        clb_grids[0][i].in_blocks = (int*)my_malloc(sizeof(int) * IO_TYPE->capacity);
-        clb_grids[0][i].grid_type = IO_TYPE;
+        bin_grids[0][i].in_blocks = (int*)my_malloc(sizeof(int) * IO_TYPE->capacity);
+        bin_grids[0][i].grid_type = IO_TYPE;
 
-        clb_grids[num_grid_columns + 1][i].in_blocks =
+        bin_grids[num_grid_columns + 1][i].in_blocks =
             (int*)my_malloc(sizeof(int) * IO_TYPE->capacity);
-        clb_grids[num_grid_columns + 1][i].grid_type = IO_TYPE;
+        bin_grids[num_grid_columns + 1][i].grid_type = IO_TYPE;
 
         for (j = 0; j < IO_TYPE->capacity; j++) {
-            clb_grids[0][i].in_blocks[j] = EMPTY;
-            clb_grids[num_grid_columns + 1][i].in_blocks[j] = EMPTY;
+            bin_grids[0][i].in_blocks[j] = EMPTY;
+            bin_grids[num_grid_columns + 1][i].in_blocks[j] = EMPTY;
         }
     }
 
@@ -346,29 +346,29 @@ static void alloc_and_load_grid(INOUT int* num_instances_type)
         type = find_type_col(i);
 
         for (j = 1; j <= num_grid_rows; j++) {
-            clb_grids[i][j].grid_type = type;
-            clb_grids[i][j].m_offset = (j - 1) % type->height;
+            bin_grids[i][j].grid_type = type;
+            bin_grids[i][j].m_offset = (j - 1) % type->height;
 
-            if (j + clb_grids[i][j].grid_type->height - 1 - clb_grids[i][j].m_offset >
+            if (j + bin_grids[i][j].grid_type->height - 1 - bin_grids[i][j].m_offset >
                     num_grid_rows) {
-                clb_grids[i][j].grid_type = EMPTY_TYPE;
-                clb_grids[i][j].m_offset = 0;
+                bin_grids[i][j].grid_type = EMPTY_TYPE;
+                bin_grids[i][j].m_offset = 0;
             }
 
             if (type->capacity > 1) {
                 printf(ERRTAG
                        "In FillArch() expected core blocks to have capacity <= 1 but "
                        "(%d, %d) has type '%s' and capacity %d\n",
-                       i, j, clb_grids[i][j].grid_type->name,
-                       clb_grids[i][j].grid_type->capacity);
+                       i, j, bin_grids[i][j].grid_type->name,
+                       bin_grids[i][j].grid_type->capacity);
                 exit(1);
             }
 
-            clb_grids[i][j].in_blocks = (int*)my_malloc(sizeof(int));
-            clb_grids[i][j].in_blocks[0] = EMPTY;
+            bin_grids[i][j].in_blocks = (int*)my_malloc(sizeof(int));
+            bin_grids[i][j].in_blocks[0] = EMPTY;
 
-            if (clb_grids[i][j].m_offset == 0) {
-                num_instances_type[clb_grids[i][j].grid_type->index]++;
+            if (bin_grids[i][j].m_offset == 0) {
+                num_instances_type[bin_grids[i][j].grid_type->index]++;
             }
         }
     }
@@ -380,7 +380,7 @@ static void alloc_and_load_grid(INOUT int* num_instances_type)
 
     for (j = (num_grid_rows + 1); j >= 0; --j) {
         for (i = 0; i <= (num_grid_columns + 1); ++i) {
-            fprintf(dump, "%c", clb_grids[i][j].grid_type->name[1]);
+            fprintf(dump, "%c", bin_grids[i][j].grid_type->name[1]);
         }
 
         fprintf(dump, "\n");
@@ -395,11 +395,11 @@ static void freeGrid()
     int i, j;
     for (i = 0; i <= (num_grid_columns + 1); ++i) {
         for (j = 0; j <= (num_grid_rows + 1); ++j) {
-            free(clb_grids[i][j].in_blocks);
+            free(bin_grids[i][j].in_blocks);
         }
     }
 
-    free_matrix(clb_grids, 0,
+    free_matrix(bin_grids, 0,
                 num_grid_columns + 1, 0,
                 sizeof(grid_tile_t));
 }
@@ -411,30 +411,30 @@ static void CheckGrid()
     /* Check grid is valid */
     for (i = 0; i <= (num_grid_columns + 1); ++i) {
         for (j = 0; j <= (num_grid_rows + 1); ++j) {
-            if (NULL == clb_grids[i][j].grid_type) {
+            if (NULL == bin_grids[i][j].grid_type) {
                 printf(ERRTAG "grid[%d][%d] has no type.\n", i,
                        j);
                 exit(1);
             }
 
-            if (clb_grids[i][j].m_usage != 0) {
+            if (bin_grids[i][j].m_usage != 0) {
                 printf(ERRTAG
                        "grid[%d][%d] has non-zero usage (%d) "
                        "before netlist load.\n", i, j,
-                       clb_grids[i][j].m_usage);
+                       bin_grids[i][j].m_usage);
                 exit(1);
             }
 
-            if ((clb_grids[i][j].m_offset < 0) ||
-                    (clb_grids[i][j].m_offset >= clb_grids[i][j].grid_type->height)) {
+            if ((bin_grids[i][j].m_offset < 0) ||
+                    (bin_grids[i][j].m_offset >= bin_grids[i][j].grid_type->height)) {
                 printf(ERRTAG
                        "grid[%d][%d] has invalid offset (%d)\n",
-                       i, j, clb_grids[i][j].m_offset);
+                       i, j, bin_grids[i][j].m_offset);
                 exit(1);
             }
 
-            if ((NULL == clb_grids[i][j].in_blocks) &&
-                    (clb_grids[i][j].grid_type->capacity > 0)) {
+            if ((NULL == bin_grids[i][j].in_blocks) &&
+                    (bin_grids[i][j].grid_type->capacity > 0)) {
                 printf(ERRTAG
                        "grid[%d][%d] has no block list allocated.\n",
                        i, j);

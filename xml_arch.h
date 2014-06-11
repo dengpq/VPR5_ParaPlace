@@ -25,7 +25,7 @@ struct s_arch {
     double T_ipin_cblock;
     double grid_logic_tile_area;
     double ipin_mux_trans_size;
-    struct s_clb_grid clb_grid;
+    struct s_clb_grid bin_grids;
     segment_info_t* Segments;
     int num_segments;
     switch_info_t* Switches;
