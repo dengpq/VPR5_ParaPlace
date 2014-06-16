@@ -460,7 +460,7 @@ build_rr_graph(IN t_graph_type graph_type,
         track_to_ipin_lookup[i] =
             alloc_and_load_track_to_pin_lookup(ipin_to_track_map[i],
                                                Fc_in[i], types[i].height,
-                                               types[i].num_pins,
+                                               types[i].num_type_pins,
                                                nodes_per_chan);
     }
 
@@ -579,7 +579,7 @@ build_rr_graph(IN t_graph_type graph_type,
 
     if (opin_to_track_map) {
         for (i = 0; i < num_types; ++i) {
-            free_matrix4(opin_to_track_map[i], 0, types[i].num_pins - 1,
+            free_matrix4(opin_to_track_map[i], 0, types[i].num_type_pins - 1,
                          0, types[i].height - 1, 0, 3, 0, sizeof(int));
         }
 
@@ -767,7 +767,7 @@ free_type_pin_to_track_map(int**** * ipin_to_track_map, block_type_ptr types, in
     int i;
 
     for (i = 0; i < num_types; i++) {
-        free_matrix4(ipin_to_track_map[i], 0, types[i].num_pins - 1,
+        free_matrix4(ipin_to_track_map[i], 0, types[i].num_type_pins - 1,
                      0, types[i].height - 1, 0, 3, 0, sizeof(int));
     }
 
@@ -907,7 +907,7 @@ build_bidir_rr_opins(IN int i,
     type = grid[i][j].grid_type;
     Fc = Fc_out[type->index];
 
-    for (ipin = 0; ipin < type->num_pins; ++ipin) {
+    for (ipin = 0; ipin < type->num_type_pins; ++ipin) {
         /* We only are working with opins so skip non-drivers */
         if (type->class_inf[type->pin_class[ipin]].type != DRIVER) {
             continue;
@@ -1090,9 +1090,6 @@ build_rr_sinks_sources(IN int i,
     /* Loads IPIN, SINK, SOURCE, and OPIN.
      * Loads IPIN to SINK edges, and SOURCE to OPIN edges */
     int ipin, iclass, inode, pin_num, to_node, num_edges;
-    int num_class, num_pins;
-    pin_class_t* class_inf;
-    int* pin_class;
 
     /* Since we share nodes within a large block, only
      * start tile can initialize sinks, sources, and pins */
@@ -1101,10 +1098,10 @@ build_rr_sinks_sources(IN int i,
     }
 
     block_type_ptr type = grid[i][j].grid_type;
-    num_class = type->num_class;
-    class_inf = type->class_inf;
-    num_pins = type->num_pins;
-    pin_class = type->pin_class;
+    int num_class = type->num_class;
+    pin_class_t* class_inf = type->class_inf;
+    int num_pins = type->num_type_pins;
+    int* pin_class = type->pin_class;
 
     /* SINKS and SOURCE to OPIN edges */
     for (iclass = 0; iclass < num_class; iclass++) {
@@ -1564,15 +1561,16 @@ alloc_and_load_pin_to_track_map(IN pin_types_t pin_type,
      * If pin ipin on side iside does not exist or is of the wrong type,
      * tracks_connected_to_pin[ipin][iside][0] = OPEN.                               */
 
-    if (Type->num_pins < 1) {
+    if (Type->num_type_pins < 1) {
         return NULL;
     }
 
     tracks_connected_to_pin = (int****)
-                              alloc_matrix4(0, Type->num_pins - 1,
-                                            0, Type->height - 1, 0, 3, 0, Fc - 1, sizeof(int));
+                              alloc_matrix4(0, Type->num_type_pins - 1,
+                                            0, Type->height - 1, 0, 3, 0, Fc - 1,
+                                            sizeof(int));
 
-    for (ipin = 0; ipin < Type->num_pins; ipin++) {
+    for (ipin = 0; ipin < Type->num_type_pins; ipin++) {
         for (ioff = 0; ioff < Type->height; ioff++) {
             for (iside = 0; iside < 4; iside++) {
                 for (i = 0; i < Fc; ++i) {
@@ -1585,12 +1583,12 @@ alloc_and_load_pin_to_track_map(IN pin_types_t pin_type,
     num_dir = (int**)alloc_matrix(0, Type->height - 1, 0, 3, sizeof(int));
     dir_list =
         (int***)alloc_matrix3(0, Type->height - 1, 0, 3, 0,
-                              Type->num_pins - 1, sizeof(int));
+                              Type->num_type_pins - 1, sizeof(int));
 
     /* Defensive coding.  Try to crash hard if I use an unset entry.  */
     for (i = 0; i < Type->height; i++)
         for (j = 0; j < 4; j++)
-            for (k = 0; k < Type->num_pins; k++) {
+            for (k = 0; k < Type->num_type_pins; k++) {
                 dir_list[i][j][k] = (-1);
             }
 
@@ -1599,7 +1597,7 @@ alloc_and_load_pin_to_track_map(IN pin_types_t pin_type,
             num_dir[i][j] = 0;
         }
 
-    for (ipin = 0; ipin < Type->num_pins; ipin++) {
+    for (ipin = 0; ipin < Type->num_type_pins; ipin++) {
         iclass = Type->pin_class[ipin];
 
         if (Type->class_inf[iclass].type != pin_type) { /* Doing either ipins OR opins */
@@ -1866,7 +1864,7 @@ check_all_tracks_reach_pins(block_type_ptr type,
     assert(nodes_per_chan > 0);
     num_conns_to_track = (int*)my_calloc(nodes_per_chan, sizeof(int));
 
-    for (ipin = 0; ipin < type->num_pins; ipin++) {
+    for (ipin = 0; ipin < type->num_type_pins; ipin++) {
         for (ioff = 0; ioff < type->height; ioff++) {
             for (iside = 0; iside < 4; iside++) {
                 if (tracks_connected_to_pin[ipin][ioff][iside][0]
@@ -2154,9 +2152,8 @@ build_unidir_rr_opins(IN int i,
     }
 
     block_type_ptr type = grid[i][j].grid_type;
-
     /* Go through each pin and find its fanout. */
-    for (ipin = 0; ipin < type->num_pins; ++ipin) {
+    for (ipin = 0; ipin < type->num_type_pins; ++ipin) {
         /* Skip global pins and ipins */
         iclass = type->pin_class[ipin];
 

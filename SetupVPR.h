@@ -1,6 +1,9 @@
 #ifndef SETUPVPR_H
 #define SETUPVPR_H
 
+#include "vpr_types_parallel.h"
+#include "ReadOptions.h"
+#include "xml_arch.h"
 #include "util.h"
 
 boolean IsTimingEnabled(IN t_options Options);

@@ -430,9 +430,8 @@ init_draw_coords(double width_val)
     pin_size = 0.3;
 
     for (i = 0; i < num_types; ++i) {
-        pin_size =
-            min(pin_size,
-                (tile_width / (4.0 * type_descriptors[i].num_pins)));
+        pin_size = min(pin_size,
+                       (tile_width / (4.0 * type_descriptors[i].num_type_pins)));
     }
 
     j = 0;
@@ -1347,7 +1346,7 @@ get_rr_pin_draw_coords(int inode,
     int j = rr_node[inode].ylow + ioff; /* Need correct tile of blocks */
     int ipin = rr_node[inode].ptc_num;
     block_type_ptr type = bin_grids[i][j].grid_type;
-    int pins_per_sub_tile = bin_grids[i][j].grid_type->num_pins /
+    int pins_per_sub_tile = bin_grids[i][j].grid_type->num_type_pins /
                               bin_grids[i][j].grid_type->capacity;
     int k = ipin / pins_per_sub_tile;
     /* Since pins numbers go across all sub_tiles in a blocks in order
@@ -1355,7 +1354,8 @@ get_rr_pin_draw_coords(int inode,
     /* For each sub_tile we need and extra padding space */
     double xc = tile_x[i];
     double yc = tile_y[j];
-    double step = (double)(tile_width) / (double)(type->num_pins + type->capacity);
+    double step = (double)(tile_width) /
+                    (double)(type->num_type_pins + type->capacity);
     double offset = (ipin + k + 1) * step;
 
     switch (iside) {
@@ -1692,7 +1692,7 @@ static void highlight_blocks(double x,
     block_num = bin_grids[i][j].in_blocks[k];
 
     /* Highlight fanin and fanout. */
-    for (k = 0; k < type->num_pins; k++) {
+    for (k = 0; k < type->num_type_pins; k++) {
         /* Each pin on a FB */
         netnum = blocks[block_num].nets[k];
 

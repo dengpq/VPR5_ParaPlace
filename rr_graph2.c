@@ -889,7 +889,7 @@ alloc_and_load_rr_node_indices(IN int nodes_per_chan,
                 indices[SINK][i][j] = tmp;
                 /* Load the pin lookups. The ptc nums for IPIN and OPIN
                  * are disjoint so they can share the list. */
-                tmp.nelem = type->num_pins;
+                tmp.nelem = type->num_type_pins;
                 tmp.list = NULL;
 
                 if (tmp.nelem > 0) {
@@ -1056,13 +1056,13 @@ get_rr_node_index(int x,
             break;
 
         case OPIN:
-            assert(ptc < type->num_pins);
+            assert(ptc < type->num_type_pins);
             iclass = type->pin_class[ptc];
             assert(type->class_inf[iclass].type == DRIVER);
             break;
 
         case IPIN:
-            assert(ptc < type->num_pins);
+            assert(ptc < type->num_type_pins);
             iclass = type->pin_class[ptc];
             assert(type->class_inf[iclass].type == RECEIVER);
             break;

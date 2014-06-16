@@ -244,11 +244,10 @@ get_average_opin_delay(vector_t** * rr_node_indices,
 
     for (itype = 0;
             itype < num_types && &type_descriptors[itype] != IO_TYPE; itype++) {
-        for (ipin = 0; ipin < type_descriptors[itype].num_pins; ipin++) {
+        for (ipin = 0; ipin < type_descriptors[itype].num_type_pins; ipin++) {
             iclass = type_descriptors[itype].pin_class[ipin];
 
-            if (type_descriptors[itype].class_inf[iclass].type ==
-                    DRIVER) {
+            if (type_descriptors[itype].class_inf[iclass].type == DRIVER) {
                 /* OPIN */
                 inode =
                     get_rr_node_index((num_grid_columns + 1) / 2, (num_grid_rows + 1) / 2,

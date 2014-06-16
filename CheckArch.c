@@ -15,9 +15,8 @@ static void CheckSegments(IN t_arch Arch);
 
 /******** Function Implementations ********/
 
-void
-CheckArch(IN t_arch Arch,
-          IN boolean TimingEnabled)
+void CheckArch(IN t_arch Arch,
+               IN boolean TimingEnabled)
 {
     CheckSwitches(Arch, TimingEnabled);
     CheckSegments(Arch);
@@ -72,3 +71,4 @@ static void CheckSegments(IN t_arch Arch)
         }
     }
 }
+

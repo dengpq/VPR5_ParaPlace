@@ -197,12 +197,12 @@ double** alloc_and_load_timing_graph(timing_info_t timing_inf,
      * tnode_descript to use ints instead of shorts for isubblk or ipin.        */
 
     for (i = 0; i < num_types; i++) {
-        if (type_descriptors[i].num_pins > MAX_SHORT) {
+        if (type_descriptors[i].num_type_pins > MAX_SHORT) {
             printf
             ("Error in alloc_and_load_timing_graph: pins for type %s is %d."
              "\tWill cause short overflow in tnode_descript.\n",
              type_descriptors[i].name,
-             type_descriptors[i].num_pins);
+             type_descriptors[i].num_type_pins);
             exit(1);
         }
 
@@ -295,10 +295,10 @@ static int alloc_and_load_pin_mappings(int** *block_pin_to_tnode_ptr,
     for (iblk = 0; iblk < num_blocks; iblk++) {
         type = blocks[iblk].block_type;
         block_pin_to_tnode[iblk] =
-            (int*)my_malloc(type->num_pins * sizeof(int));
+            (int*)my_malloc(type->num_type_pins * sizeof(int));
 
         /* First do the block mapping */
-        for (ipin = 0; ipin < blocks[iblk].block_type->num_pins; ipin++) {
+        for (ipin = 0; ipin < blocks[iblk].block_type->num_type_pins; ipin++) {
             if (blocks[iblk].nets[ipin] == OPEN) {
                 block_pin_to_tnode[iblk][ipin] = OPEN;
             } else {
@@ -451,7 +451,7 @@ alloc_and_load_fanout_counts(int** *num_uses_of_fb_ipin_ptr,
 
     for (iblk = 0; iblk < num_blocks; iblk++) {
         num_uses_of_fb_ipin[iblk] =
-            (int*)my_calloc(blocks[iblk].block_type->num_pins, sizeof(int));
+            (int*)my_calloc(blocks[iblk].block_type->num_type_pins, sizeof(int));
         num_uses_of_sblk_opin[iblk] =
             (int**)alloc_matrix(0, blocks[iblk].block_type->max_subblocks - 1,
                                 0,
@@ -555,14 +555,12 @@ build_fb_tnodes(int iblk,
     edge_t* tedge;
 
     block_type_ptr type = blocks[iblk].block_type;
-    int* next_ipin_edge = (int*)my_malloc(type->num_pins * sizeof(int));
+    int* next_ipin_edge = (int*)my_malloc(type->num_type_pins * sizeof(int));
     int clk_pin = 0;
 
     /* Start by allocating the tedge arrays, and for opins, loading them.    */
-
-    for (ipin = 0; ipin < blocks[iblk].block_type->num_pins; ipin++) {
+    for (ipin = 0; ipin < blocks[iblk].block_type->num_type_pins; ++ipin) {
         inode = block_pin_to_tnode[iblk][ipin];
-
         if (inode != OPEN) {
             /* Pin is used->put in graph */
             if (is_opin(ipin, blocks[iblk].block_type)) {
@@ -615,7 +613,7 @@ build_fb_tnodes(int iblk,
             /* Not OPEN and comes from fb ipin? */
 
             if (from_pin != OPEN
-                    && from_pin < blocks[iblk].block_type->num_pins) {
+                    && from_pin < blocks[iblk].block_type->num_type_pins) {
                 inode = block_pin_to_tnode[iblk][from_pin];
                 assert(inode != OPEN);
                 to_node = sub_pin_to_tnode[isub][SUB_INPUT][ipin];
@@ -628,7 +626,7 @@ build_fb_tnodes(int iblk,
 
         from_pin = sub_inf[isub].clock;
 
-        if (from_pin != OPEN && from_pin < blocks[iblk].block_type->num_pins) {
+        if (from_pin != OPEN && from_pin < blocks[iblk].block_type->num_type_pins) {
             inode = block_pin_to_tnode[iblk][from_pin];
             to_node = sub_pin_to_tnode[isub][SUB_CLOCK][clk_pin];   /* Feeds seq. output */
 
@@ -905,18 +903,16 @@ static void build_subblock_tnodes(int** n_uses_of_sblk_opin,
 
                 /* Not OPEN and comes from local subblock output? */
 
-                if (from_pin >= type->num_pins) {
+                if (from_pin >= type->num_type_pins) {
                     /* Convention for numbering netlist pins.
                      * Internal connections are numbered subblock_index + subblock_output_index + num_pins
                      */
-                    from_sub =
-                        (from_pin - type->num_pins) / type->max_subblock_outputs;
-                    from_opin =
-                        (from_pin - type->num_pins) % type->max_subblock_outputs;
-                    inode =
-                        sub_pin_to_tnode[from_sub][SUB_OUTPUT][from_opin];
-                    to_node =
-                        sub_pin_to_tnode[isub][SUB_INPUT][ipin];
+                    from_sub = (from_pin - type->num_type_pins) /
+                                    type->max_subblock_outputs;
+                    from_opin = (from_pin - type->num_type_pins) %
+                                    type->max_subblock_outputs;
+                    inode = sub_pin_to_tnode[from_sub][SUB_OUTPUT][from_opin];
+                    to_node = sub_pin_to_tnode[isub][SUB_INPUT][ipin];
                     tedge = vertexes[inode].out_edges;
                     iedge = next_sblk_opin_edge[from_sub][from_opin]++;
                     tedge[iedge].to_node = to_node;
@@ -929,24 +925,21 @@ static void build_subblock_tnodes(int** n_uses_of_sblk_opin,
 
             /* Not OPEN and comes from local subblock output? */
 
-            if (from_pin >= type->num_pins) {
-                from_sub =
-                    (from_pin - type->num_pins) / type->max_subblock_outputs;
-                from_opin =
-                    (from_pin - type->num_pins) % type->max_subblock_outputs;
+            if (from_pin >= type->num_type_pins) {
+                from_sub = (from_pin - type->num_type_pins) /
+                               type->max_subblock_outputs;
+                from_opin = (from_pin - type->num_type_pins) %
+                               type->max_subblock_outputs;
                 inode = sub_pin_to_tnode[from_sub][SUB_OUTPUT][from_opin];
                 /* Feeds seq. output, one ff per output pin */
-                to_node =
-                    sub_pin_to_tnode[isub][SUB_CLOCK][clk_pin] +
-                    2 * used_opin_count;
+                to_node = sub_pin_to_tnode[isub][SUB_CLOCK][clk_pin] +
+                            2 * used_opin_count;
                 tedge = vertexes[inode].out_edges;
                 iedge = next_sblk_opin_edge[from_sub][from_opin]++;
                 tedge[iedge].to_node = to_node;
 
                 /* NB: Could make sblk opin to clk Tdel parameter; not worth it right now. */
-                tedge[iedge].Tdel =
-                    type->type_timing_inf.
-                    T_sblk_opin_to_sblk_ipin;
+                tedge[iedge].Tdel = type->type_timing_inf.T_sblk_opin_to_sblk_ipin;
             }
 
             to_pin = sub_inf[isub].outputs[opin];

@@ -122,10 +122,19 @@ SetupVPR(IN t_options Options,
     EchoArch("arch.echo", type_descriptors, num_types);
 #endif
 
+    /* first read Arch file, then read netlist file */
     if (Options.NetFile) {
-        read_netlist(Options.NetFile, num_types, type_descriptors,
-                     IO_TYPE, 0, 1, Subblocks, &num_blocks, &blocks,
-                     &num_nets, &net);
+        read_netlist(Options.NetFile,
+                     num_types,
+                     type_descriptors,
+                     IO_TYPE,
+                     0,
+                     1,
+                     Subblocks,
+                     &num_blocks,
+                     &blocks,
+                     &num_nets,
+                     &net);
         /* This is done so that all blocks have subblocks and can be treated the same */
         load_subblock_info_to_type(Subblocks, IO_TYPE);
         check_netlist(Subblocks);
@@ -138,21 +147,20 @@ SetupVPR(IN t_options Options,
  * Sets globals: num_grid_columns, num_grid_rows
  * Allocs globals: chan_width_x, chan_width_y, grid
  * Depends on num_clbs, pins_per_clb */
-static void
-InitArch(IN t_arch Arch)
+static void InitArch(IN t_arch Arch)
 {
-    int i;
     boolean fit;
-    int current = nint(sqrt(num_blocks));   /* current is the value of the smaller side of the FPGA */
-    int low = 1;
-    int high = -1;
     int* num_instances_type = (int*)my_calloc(num_types, sizeof(int));
     int* num_blocks_type = (int*)my_calloc(num_types, sizeof(int));
 
+    int i = -1;
     for (i = 0; i < num_blocks; i++) {
         num_blocks_type[blocks[i].block_type->index]++;
     }
 
+    int current = nint(sqrt(num_blocks));   /* current is the value of the smaller side of the FPGA */
+    int low = 1;
+    int high = -1;
     if (Arch.bin_grids.IsAuto) {
         /* Auto-size FPGA, perform a binary search */
         while (high == -1 || low < high) {
@@ -186,7 +194,6 @@ InitArch(IN t_arch Arch)
                 /* increase size of max */
                 if (high == -1) {
                     current = current * 2;
-
                     if (current > MAX_SHORT) {
                         printf(ERRTAG
                                "FPGA required is too large for current architecture settings\n");
@@ -204,7 +211,7 @@ InitArch(IN t_arch Arch)
                 high = current;
                 current = low + ((high - low) / 2);
             }
-        }
+        } /* end of while() */
 
         /* Generate grid */
         if (Arch.bin_grids.Aspect >= 1.0) {
@@ -225,7 +232,6 @@ InitArch(IN t_arch Arch)
 
     /* Test if netlist fits in grid */
     fit = TRUE;
-
     for (i = 0; i < num_types; i++) {
         if (num_blocks_type[i] > num_instances_type[i]) {
             fit = FALSE;
@@ -241,7 +247,6 @@ InitArch(IN t_arch Arch)
     }
 
     printf("\nResource Usage:\n");
-
     for (i = 0; i < num_types; i++) {
         printf("Netlist      %d\tblocks of type %s\n",
                num_blocks_type[i], type_descriptors[i].name);
@@ -451,9 +456,8 @@ static block_type_ptr find_type_col(IN int x)
     double rel;
     boolean match;
     int priority, num_loc;
-    block_type_ptr column_type;
     priority = CLB_TYPE->grid_loc_def[0].priority;
-    column_type = CLB_TYPE;
+    block_type_ptr column_type = CLB_TYPE;
 
     for (i = 0; i < num_types; i++) {
         if (&type_descriptors[i] == IO_TYPE ||
@@ -465,18 +469,13 @@ static block_type_ptr find_type_col(IN int x)
         num_loc = type_descriptors[i].num_grid_loc_def;
 
         for (j = 0; j < num_loc; j++) {
-            if (priority <
-                    type_descriptors[i].grid_loc_def[j].priority) {
+            if (priority < type_descriptors[i].grid_loc_def[j].priority) {
                 match = FALSE;
 
-                if (type_descriptors[i].grid_loc_def[j].
-                        grid_loc_type == COL_REPEAT) {
-                    start =
-                        type_descriptors[i].grid_loc_def[j].
-                        start_col;
-                    repeat =
-                        type_descriptors[i].grid_loc_def[j].
-                        repeat;
+                if (type_descriptors[i].grid_loc_def[j].grid_loc_type
+                        == COL_REPEAT) {
+                    start = type_descriptors[i].grid_loc_def[j].start_col;
+                    repeat = type_descriptors[i].grid_loc_def[j].repeat;
 
                     if (start < 0) {
                         start += (num_grid_columns + 1);
@@ -789,14 +788,14 @@ SetupAnnealSched(IN t_options Options,
     }
 
     AnnealSched->inner_num = 10.0;  /* DEFAULT */
-
     if (Options.Count[OT_FAST]) {
         AnnealSched->inner_num = 1.0;   /* DEFAULT for fast*/
     }
 
-    if (Options.Count[OT_INNER_NUM]) {
+    if (Options.Count[OT_INNER_NUM] != 0) {
         AnnealSched->inner_num = Options.PlaceInnerNum;
     }
+    printf("AnnealSched inner_num is: %f.\n", AnnealSched->inner_num);
 
     if (AnnealSched->inner_num <= 0) {
         printf(ERRTAG "init_t must be greater than 0\n");
@@ -1011,7 +1010,7 @@ load_subblock_info_to_type(INOUT subblock_data_t* subblocks,
                 (int*)my_malloc(type->max_subblock_outputs *
                                 sizeof(int));
 
-            for (i = 0; i < type->num_pins; i++) {
+            for (i = 0; i < type->num_type_pins; i++) {
                 if (i < type->max_subblock_inputs) {
                     subblock_inf[iblk][0].inputs[i] =
                         (blocks[iblk].nets[i] == OPEN) ? OPEN : i;

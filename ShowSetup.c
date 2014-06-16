@@ -33,7 +33,6 @@ ShowSetup(IN t_options Options,
           IN timing_info_t Timing,
           IN subblock_data_t Subblocks)
 {
-    int i, j, num_p_inputs, num_p_outputs;
     printf("Timing analysis: %s\n", (TimingEnabled ? "ON" : "OFF"));
     printf("\n");
     ShowOperation(Operation);
@@ -55,20 +54,20 @@ ShowSetup(IN t_options Options,
     printf("Netlist num_nets:  %d\n", num_nets);
     printf("Netlist num_blocks:  %d\n", num_blocks);
     /* Count I/O input and output pads */
-    num_p_inputs = 0;
-    num_p_outputs = 0;
+    int num_p_inputs = 0;
+    int num_p_outputs = 0;
 
+    int i, j;
     for (i = 0; i < num_blocks; i++) {
         if (blocks[i].block_type == IO_TYPE) {
-            for (j = 0; j < IO_TYPE->num_pins; j++) {
+            for (j = 0; j < IO_TYPE->num_type_pins; j++) {
                 if (blocks[i].nets[j] != OPEN) {
+                    printf("  IO block[%d].nets[%d] = %d.\n", i, j, blocks[i].nets[j]);
                     if (IO_TYPE->class_inf[IO_TYPE->pin_class[j]].type == DRIVER) {
                         num_p_inputs++;
                     } else {
-                        assert(IO_TYPE->
-                               class_inf[IO_TYPE->
-                                         pin_class[j]].
-                               type == RECEIVER);
+                        assert(IO_TYPE->class_inf[IO_TYPE->pin_class[j]].type
+                                 == RECEIVER);
                         num_p_outputs++;
                     }
                 }

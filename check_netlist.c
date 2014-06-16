@@ -65,11 +65,12 @@ void check_netlist(subblock_data_t* subblock_data_ptr)
     max_subblocks = 0;
 
     for (i = 0; i < num_types; i++) {
-        max_subblocks =
-            max(max_subblocks, type_descriptors[i].max_subblocks);
-        max_pins = max(max_pins, type_descriptors[i].num_pins);
-        max_sub_opins =
-            max(max_sub_opins, type_descriptors[i].max_subblock_outputs);
+        max_subblocks = max(max_subblocks,
+                            type_descriptors[i].max_subblocks);
+        max_pins = max(max_pins,
+                       type_descriptors[i].num_type_pins);
+        max_sub_opins = max(max_sub_opins,
+                            type_descriptors[i].max_subblock_outputs);
     }
 
     /* one mem alloc to save space */
@@ -168,9 +169,8 @@ check_connections_to_global_fb_pins(int inet)
 }
 
 
-static int
-check_fb_conn(int iblk,
-              int num_conn)
+static int check_fb_conn(int iblk,
+                         int num_conn)
 {
     /* Checks that the connections into and out of the fb make sense.  */
     int iclass, ipin;
@@ -193,7 +193,7 @@ check_fb_conn(int iblk,
          * abort.                                                                  */
 
         if (num_conn == 1) {
-            for (ipin = 0; ipin < type->num_pins; ipin++) {
+            for (ipin = 0; ipin < type->num_type_pins; ipin++) {
                 if (blocks[iblk].nets[ipin] != OPEN) {
                     iclass = type->pin_class[ipin];
 
@@ -215,8 +215,7 @@ check_fb_conn(int iblk,
 
     /* This case should already have been flagged as an error -- this is *
      * just a redundant double check.                                    */
-
-    if (num_conn > type->num_pins) {
+    if (num_conn > type->num_type_pins) {
         printf("Error:  logic block #%d with output %s has %d pins.\n",
                iblk, blocks[iblk].name, num_conn);
         error++;
@@ -226,8 +225,7 @@ check_fb_conn(int iblk,
 }
 
 
-static int
-check_for_duplicate_block_names(void)
+static int check_for_duplicate_block_names(void)
 {
     /* Checks that all blocks have duplicate names.  Returns the number of     *
      * duplicate names.                                                        */
@@ -268,7 +266,7 @@ check_subblocks(int iblk,
     /* This routine checks the subblocks of iblk (which must be a FB).  It    *
      * returns the number of errors found.                                    */
     int isub, ipin, fb_pin;
-    int num_pins_fb = blocks[iblk].block_type->num_pins;
+    int num_pins_fb = blocks[iblk].block_type->num_type_pins;
     int error = 0;
     subblock_t* subblock_inf = subblock_data_ptr->subblock_inf[iblk];
     int num_subblocks = subblock_data_ptr->num_subblocks_per_block[iblk];
@@ -353,7 +351,7 @@ check_subblock_pin(int fb_pin,
             return (1);
         }
 
-        if (fb_pin < type->num_pins) {
+        if (fb_pin < type->num_type_pins) {
             /* clb pin */
             iclass = type->pin_class[fb_pin];
 
@@ -395,9 +393,7 @@ static void check_for_multiple_sink_connections(void)
                 continue;
             }
 
-            for (class_pin = 0;
-                    class_pin < type->class_inf[iclass].num_pins;
-                    class_pin++) {
+            for (class_pin = 0; class_pin < type->class_inf[iclass].num_pins; class_pin++) {
                 ipin = type->class_inf[iclass].pinlist[class_pin];
                 inet = blocks[iblk].nets[ipin];
 
@@ -406,9 +402,7 @@ static void check_for_multiple_sink_connections(void)
                 }
             }
 
-            for (class_pin = 0;
-                    class_pin < type->class_inf[iclass].num_pins;
-                    class_pin++) {
+            for (class_pin = 0; class_pin < type->class_inf[iclass].num_pins; class_pin++) {
                 ipin = type->class_inf[iclass].pinlist[class_pin];
                 inet = blocks[iblk].nets[ipin];
 
@@ -442,8 +436,12 @@ static int get_num_conn(int block_num)
     block_type_ptr type = blocks[block_num].block_type;
     int num_conn = 0;
 
-    int i;
-    for (i = 0; i < type->num_pins; i++) {
+    /* for debug */
+    if (type == IO_TYPE) {
+        printf("IO block had at most %d block pins.\n", type->num_type_pins);
+    } /* end of debug */
+    int i = -1;
+    for (i = 0; i < type->num_type_pins; ++i) {
         if (blocks[block_num].nets[i] != OPEN) {
             num_conn++;
         }
@@ -579,7 +577,7 @@ check_fb_to_subblock_connections(int iblk,
         }
     }
 
-    for (ipin = 0; ipin < blocks[iblk].block_type->num_pins; ipin++) {
+    for (ipin = 0; ipin < blocks[iblk].block_type->num_type_pins; ++ipin) {
         if (blocks[iblk].nets[ipin] != OPEN) {
             if (is_opin(ipin, blocks[iblk].block_type)) {
                 /* FB output */

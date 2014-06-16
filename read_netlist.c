@@ -38,9 +38,7 @@ void read_netlist(IN const char* net_file,
              OUT net_t* net_list[])
 {
     int i, j, k, l, m;
-    enum
-    { COUNT, LOAD, MAP, STOP }
-    pass;
+    enum { COUNT, LOAD, MAP, STOP } pass;
     int line, prev_line;
     enum special_blk overide;
     char** block_tokens;
@@ -84,18 +82,18 @@ void read_netlist(IN const char* net_file,
 
         /* Alloc the lists */
         if (LOAD == pass) {
-            blist =
-                (block_t*)my_malloc(sizeof(block_t) *
+            blist = (block_t*)my_malloc(sizeof(block_t) *
                                            bcount);
             memset(blist, 0, (sizeof(block_t) * bcount));
-            nlist =
-                (net_t*)my_malloc(sizeof(net_t) *
+
+            nlist = (net_t*)my_malloc(sizeof(net_t) *
                                          ncount);
             memset(nlist, 0, (sizeof(net_t) * ncount));
-            slist =
-                (subblock_t**) my_malloc(sizeof(subblock_t*) *
+
+            slist = (subblock_t**) my_malloc(sizeof(subblock_t*) *
                                          bcount);
             memset(slist, 0, (sizeof(subblock_t*) * bcount));
+
             scount = (int*)my_malloc(sizeof(int) * bcount);
             memset(scount, 0, (sizeof(int) * bcount));
         }
@@ -109,9 +107,7 @@ void read_netlist(IN const char* net_file,
             if (0 == strcmp(block_tokens[0], ".global")) {
                 if (MAP == pass) {
                     for (l = 0; l < ncount; ++l) {
-                        if (0 ==
-                                strcmp(nlist[l].name,
-                                       block_tokens[1])) {
+                        if (0 == strcmp(nlist[l].name, block_tokens[1])) {
                             nlist[l].is_global = TRUE;
                             break;
                         }
@@ -172,35 +168,31 @@ void read_netlist(IN const char* net_file,
                 }
 
                 /* Make a new faked token list with 'pinlist:' and then pin mappings and a null */
-                tokens =
-                    (char**)my_malloc(sizeof(char*) *
-                                      (type->num_pins + 2));
+                tokens = (char**)my_malloc(sizeof(char*) *
+                                             (type->num_type_pins + 2));
                 l = strlen(pinlist_str) + 1;
                 k = strlen(pin_tokens[1]) + 1;
-                tokens[0] =
-                    (char*)my_malloc(sizeof(char) * (k + l));
+                tokens[0] = (char*)my_malloc(sizeof(char) * (k + l));
                 memcpy(tokens[0], pinlist_str, l * sizeof(char));
                 memcpy(tokens[0] + l, pin_tokens[1],
                        k * sizeof(char));
 
                 /* Set all other pins to open */
-                for (k = 0; k < type->num_pins; ++k) {
+                for (k = 0; k < type->num_type_pins; ++k) {
                     tokens[1 + k] = "open"; /* free wont be called on this so is safe */
                 }
 
                 tokens[1 + k] = NULL;   /* End of token list marker */
 
                 /* Set the one pin with the value given */
-                for (k = 0; k < type->num_pins; ++k) {
+                for (k = 0; k < type->num_type_pins; ++k) {
                     switch (overide) {
                         case INPAD:
-                            tokens[1 + io_opin] =
-                                (tokens[0] + l);
+                            tokens[1 + io_opin] = (tokens[0] + l);
                             break;
 
                         case OUTPAD:
-                            tokens[1 + io_ipin] =
-                                (tokens[0] + l);
+                            tokens[1 + io_ipin] = (tokens[0] + l);
                             break;
                     }
                 }
@@ -210,12 +202,11 @@ void read_netlist(IN const char* net_file,
                 tokens = NULL;
             }
 
-            if (CountTokens(pin_tokens) != (type->num_pins + 1)) {
+            if (CountTokens(pin_tokens) != (type->num_type_pins + 1)) {
                 printf(ERRTAG
                        "'%s':%d - 'pinlist:' line has %d pins instead of "
                        "expect %d pins.\n", net_file, line,
-                       CountTokens(pin_tokens) - 1,
-                       type->num_pins);
+                       CountTokens(pin_tokens) - 1, type->num_type_pins);
                 exit(1);
             }
 
@@ -223,23 +214,19 @@ void read_netlist(IN const char* net_file,
             if (LOAD == pass) {
                 blist[i].name = my_strdup(block_tokens[1]);
                 blist[i].block_type = type;
-                blist[i].nets = (int*)my_malloc(sizeof(int) * type->num_pins);
 
-                for (k = 0; k < type->num_pins; ++k) {
+                blist[i].nets = (int*)my_malloc(sizeof(int) * type->num_type_pins);
+                for (k = 0; k < type->num_type_pins; ++k) {
                     blist[i].nets[k] = OPEN;
                 }
             }
 
             /* Examine pin list to determine nets */
-            for (k = 0; k < type->num_pins; ++k) {
+            for (k = 0; k < type->num_type_pins; ++k) {
                 if (0 != strcmp("open", pin_tokens[1 + k])) {
-                    if (DRIVER ==
-                            type->class_inf[type->pin_class[k]].
-                            type) {
+                    if (DRIVER == type->class_inf[type->pin_class[k]].type) {
                         if (LOAD == pass) {
-                            nlist[j].name =
-                                my_strdup(pin_tokens
-                                          [1 + k]);
+                            nlist[j].name = my_strdup(pin_tokens[1 + k]);
                         }
 
                         if (MAP == pass) {
@@ -252,25 +239,15 @@ void read_netlist(IN const char* net_file,
                             /* Map sinks by doing a linear search to find the net */
                             blist[i].nets[k] = OPEN;
 
-                            for (l = 0; l < ncount;
-                                    ++l) {
-                                if (0 ==
-                                        strcmp(nlist
-                                               [l].
-                                               name,
-                                               pin_tokens
-                                               [1 +
-                                                k])) {
-                                    blist[i].
-                                    nets
-                                    [k] =
-                                        l;
+                            for (l = 0; l < ncount; ++l) {
+                                if (0 == strcmp(nlist[l].name,
+                                                pin_tokens[1 + k])) {
+                                    blist[i].nets[k] = l;
                                     break;
                                 }
                             }
 
-                            if (OPEN ==
-                                    blist[i].nets[k]) {
+                            if (OPEN == blist[i].nets[k]) {
                                 printf(ERRTAG
                                        "'%s':%d - Net '%s' not found\n",
                                        net_file,
@@ -339,17 +316,15 @@ void read_netlist(IN const char* net_file,
                     assert(m < scount[i]);
                     slist[i][m].name = my_strdup(tokens[1]);
 
-                    for (k = 0; k < type->max_subblock_inputs;
-                            ++k) {
+                    for (k = 0; k < type->max_subblock_inputs; ++k) {
                         /* Check prefix and load pin num */
                         l = 2 + k;
 
                         if (0 == strncmp("ble_", tokens[l], 4)) {
-                            slist[i][m].inputs[k] = type->num_pins + my_atoi(tokens[l] + 4);    /* Skip the 'ble_' part */
-                        } else if (0 !=
-                                   strcmp("open", tokens[l])) {
-                            slist[i][m].inputs[k] =
-                                my_atoi(tokens[l]);
+                            /* Skip the 'ble_' part */
+                            slist[i][m].inputs[k] = type->num_type_pins + my_atoi(tokens[l] + 4);
+                        } else if (0 != strcmp("open", tokens[l])) {
+                            slist[i][m].inputs[k] = my_atoi(tokens[l]);
                         }
                     }
 
@@ -357,16 +332,14 @@ void read_netlist(IN const char* net_file,
                         l = 2 + type->max_subblock_inputs + k;
 
                         if (0 != strcmp("open", tokens[l])) {
-                            slist[i][m].outputs[k] =
-                                my_atoi(tokens[l]);
+                            slist[i][m].outputs[k] = my_atoi(tokens[l]);
                         }
                     }
 
                     l = 2 + type->max_subblock_inputs + type->max_subblock_outputs;
 
                     if (0 != strcmp("open", tokens[l])) {
-                        slist[i][m].clock =
-                            my_atoi(tokens[l]);
+                        slist[i][m].clock = my_atoi(tokens[l]);
                     }
                 }
 

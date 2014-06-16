@@ -400,8 +400,7 @@ void print_wirelen_prob_dist(void)
 }
 
 
-void
-print_lambda(void)
+void print_lambda(void)
 {
     /* Finds the average number of input pins used per fb.  Does not    *
      * count inputs which are hooked to global nets (i.e. the clock     *
@@ -409,7 +408,6 @@ print_lambda(void)
     int block_num, ipin;
     int num_inputs_used = 0;
     int iclass, inet;
-    double lambda;
     block_type_ptr type;
 
     for (block_num = 0; block_num < num_blocks; ++block_num) {
@@ -417,7 +415,7 @@ print_lambda(void)
         assert(type != NULL);
 
         if (type != IO_TYPE) {
-            for (ipin = 0; ipin < type->num_pins; ipin++) {
+            for (ipin = 0; ipin < type->num_type_pins; ++ipin) {
                 iclass = type->pin_class[ipin];
 
                 if (type->class_inf[iclass].type == RECEIVER) {
@@ -432,6 +430,6 @@ print_lambda(void)
         }
     }
 
-    lambda = (double)num_inputs_used / (double)num_blocks;
+    double lambda = (double)num_inputs_used / (double)num_blocks;
     printf("Average lambda (input pins used per fb) is: %g\n", lambda);
 }

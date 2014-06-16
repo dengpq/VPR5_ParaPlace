@@ -40,7 +40,7 @@ void print_netlist(char* foutput,
     /* Count I/O input and output pads */
     for (i = 0; i < num_blocks; i++) {
         if (blocks[i].block_type == IO_TYPE) {
-            for (j = 0; j < IO_TYPE->num_pins; j++) {
+            for (j = 0; j < IO_TYPE->num_type_pins; j++) {
                 if (blocks[i].nets[j] != OPEN) {
                     if (IO_TYPE->class_inf[IO_TYPE->pin_class[j]].type == DRIVER) {
                         num_p_inputs++;
@@ -87,7 +87,7 @@ void print_netlist(char* foutput,
         }
 
         fprintf(fp, "%s", blocks[i].block_type->name);
-        max_pin = blocks[i].block_type->num_pins;
+        max_pin = blocks[i].block_type->num_type_pins;
 
         for (j = 0; j < max_pin; j++) {
             print_pinnum(fp, blocks[i].nets[j]);

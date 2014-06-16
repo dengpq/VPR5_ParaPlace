@@ -66,7 +66,6 @@ void place_and_route(operation_types_t operation,
 {
 
     /* This routine controls the overall placement and routing of a circuit. */
-
     char msg[BUFSIZE];
     int width_fac, inet, i;
     boolean success, Fc_clipped;
@@ -74,15 +73,13 @@ void place_and_route(operation_types_t operation,
     linked_vptr_t* net_delay_chunk_list_head;
     vector_t** fb_opins_used_locally; /* [0..num_blocks-1][0..num_class-1] */
     t_mst_edge** mst = NULL;    /* Make sure mst is never undefined */
-    int max_pins_per_fb;
 
     Fc_clipped = FALSE;
 
-    max_pins_per_fb = 0;
-
+    int max_pins_per_fb = 0;
     for (i = 0; i < num_types; i++) {
-        if (type_descriptors[i].num_pins > max_pins_per_fb) {
-            max_pins_per_fb = type_descriptors[i].num_pins;
+        if (type_descriptors[i].num_type_pins > max_pins_per_fb) {
+            max_pins_per_fb = type_descriptors[i].num_type_pins;
         }
     }
 
@@ -276,7 +273,7 @@ static int binary_search_place_and_route(placer_opts_t placer_opts,
     int i = -1;
     for (i = 0; i < num_types; ++i) {
         max_pins_per_fb = max(max_pins_per_fb,
-                              type_descriptors[i].num_pins);
+                              type_descriptors[i].num_type_pins);
     }
 
     vector_t** fb_opins_used_locally = alloc_route_structs(*subblock_data_ptr);
@@ -719,16 +716,13 @@ void post_place_sync(IN int num_blocks,
     int iblk, j, k, inet;
     block_type_ptr type;
     int max_num_block_pins;
-    subblock_t** subblock_inf;
-
-    subblock_inf = subblock_data_ptr->subblock_inf;
-
+    subblock_t** subblock_inf = subblock_data_ptr->subblock_inf;
 
     /* Go through each block */
     for (iblk = 0; iblk < num_blocks; ++iblk) {
         type = blocks[iblk].block_type;
-        assert(type->num_pins % type->capacity == 0);
-        max_num_block_pins = type->num_pins / type->capacity;
+        assert(type->num_type_pins % type->capacity == 0);
+        max_num_block_pins = type->num_type_pins / type->capacity;
 
         /* Logical location and physical location is offset by z * max_num_block_pins */
         /* Sync blocks and nets */
@@ -741,7 +735,7 @@ void post_place_sync(IN int num_blocks,
                                      blocks[iblk].nets[j];
                 blocks[iblk].nets[j] = OPEN;
 
-                for (k = 0; k < type->num_pins; k++) {
+                for (k = 0; k < type->num_type_pins; ++k) {
                     if (net[inet].node_blocks[k] == iblk) {
                         assert(net[inet].node_block_pins[k] == j);
                         net[inet].node_block_pins[k] =

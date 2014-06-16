@@ -265,21 +265,15 @@ static void alloc_net(void)
 }
 
 /**************************************/
-static void
-alloc_block(void)
+static void alloc_block(void)
 {
-
     /*allocates blocks structure, and assigns values to known parameters */
     /*type and x,y fields are left undefined at this stage since they  */
     /*are not known until we start moving blocks through the clb array */
-
     int ix_b, ix_p, len, i;
-    int max_pins;
-
-    max_pins = 0;
-
+    int max_pins = 0;
     for (i = 0; i < NUM_TYPES_USED; i++) {
-        max_pins = max(max_pins, type_descriptors[i].num_pins);
+        max_pins = max(max_pins, type_descriptors[i].num_type_pins);
     }
 
     blocks = (block_t*)my_malloc(num_blocks * sizeof(block_t));
@@ -462,10 +456,9 @@ setup_chan_width(router_opts_t router_opts,
     int width_fac, i, max_pins_per_fb;
 
     max_pins_per_fb = 0;
-
     for (i = 0; i < num_types; i++) {
-        max_pins_per_fb =
-            max(max_pins_per_fb, type_descriptors[i].num_pins);
+        max_pins_per_fb = max(max_pins_per_fb,
+                              type_descriptors[i].num_type_pins);
     }
 
     if (router_opts.fixed_channel_width == NO_FIXED_CHANNEL_WIDTH) {

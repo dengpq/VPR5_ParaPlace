@@ -354,7 +354,7 @@ void check_node(int inode,
             break;
 
         case OPIN:
-            if (ptc_num >= type->num_pins
+            if (ptc_num >= type->num_type_pins
                     || type->class_inf[type->pin_class[ptc_num]].type != DRIVER) {
                 printf
                 ("Error in check_node.  Inode %d (type %d) had a ptc_num\n"
@@ -372,7 +372,7 @@ void check_node(int inode,
             break;
 
         case IPIN:
-            if (ptc_num >= type->num_pins
+            if (ptc_num >= type->num_type_pins
                     || type->class_inf[type->pin_class[ptc_num]].type != RECEIVER) {
                 printf
                 ("Error in check_node.  Inode %d (type %d) had a ptc_num\n"

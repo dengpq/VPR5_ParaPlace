@@ -185,7 +185,7 @@ typedef struct s_grid_loc_def {
    is_Fc_out_full_flex: True means opins will connect to all available segments */
 typedef struct s_type_descriptor {
     const char* name;
-    int      num_pins;
+    int      num_type_pins;
     int      capacity;
 
     int      height;

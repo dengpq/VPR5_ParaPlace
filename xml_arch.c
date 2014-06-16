@@ -404,7 +404,7 @@ static void SetupClassInf(ezxml_t Classes,
     /* Make multiple passes to handle capacity with index increased each pass */
     int CurPin = 0;
     int CurClass = 0;
-    Type->num_pins = 0;
+    Type->num_type_pins = 0;
     Type->num_drivers = 0;
     Type->num_receivers = 0;
 
@@ -419,7 +419,7 @@ static void SetupClassInf(ezxml_t Classes,
             CountTokensInString(Cur->txt,
                                 &NumClassPins,
                                 &k);
-            Type->num_pins += NumClassPins;
+            Type->num_type_pins += NumClassPins;
             /* Alloc class structures */
             Type->class_inf[CurClass].num_pins = NumClassPins;
             Type->class_inf[CurClass].pinlist = (int*)my_malloc(NumClassPins * sizeof(int));
@@ -463,16 +463,16 @@ static void SetupPinClasses(ezxml_t Classes,
 {
     /* Allocs and sets up the classinf data and counts pins */
     SetupClassInf(Classes, Type);
-    int PinsPerSubtile = Type->num_pins / Type->capacity;
+    int PinsPerSubtile = Type->num_type_pins / Type->capacity;
     int ClassesPerSubtile = Type->num_class / Type->capacity;
     /* Alloc num_pin sized lists. Replicated pins don't have new names. */
-    Type->is_global_pin = (boolean*)my_malloc(Type->num_pins * sizeof(boolean));
-    Type->pin_class = (int*)my_malloc(Type->num_pins * sizeof(int));
+    Type->is_global_pin = (boolean*)my_malloc(Type->num_type_pins * sizeof(boolean));
+    Type->pin_class = (int*)my_malloc(Type->num_type_pins * sizeof(int));
 
-    int* pin_used = (int*)my_malloc(Type->num_pins * sizeof(int));
+    int* pin_used = (int*)my_malloc(Type->num_type_pins * sizeof(int));
 
     int i, j;
-    for (i = 0; i < Type->num_pins; ++i) {
+    for (i = 0; i < Type->num_type_pins; ++i) {
         pin_used[i] = FALSE;
     }
 
@@ -533,7 +533,7 @@ static void SetupPinClasses(ezxml_t Classes,
 static void SetupPinLocations(ezxml_t Locations,
                               type_descriptor_t* Type)
 {
-    int PinsPerSubtile = Type->num_pins / Type->capacity;
+    int PinsPerSubtile = Type->num_type_pins / Type->capacity;
     /* Alloc and clear pin locations */
     Type->pinloc = (int***)my_malloc(Type->height * sizeof(int**));
 
@@ -542,9 +542,9 @@ static void SetupPinLocations(ezxml_t Locations,
         Type->pinloc[i] = (int**)my_malloc(4 * sizeof(int*));
 
         for (j = 0; j < 4; ++j) {
-            Type->pinloc[i][j] = (int*)my_malloc(Type->num_pins * sizeof(int));
+            Type->pinloc[i][j] = (int*)my_malloc(Type->num_type_pins * sizeof(int));
 
-            for (k = 0; k < Type->num_pins; ++k) {
+            for (k = 0; k < Type->num_type_pins; ++k) {
                 Type->pinloc[i][j][k] = 0;
             }
         }
@@ -612,10 +612,8 @@ static void SetupPinLocations(ezxml_t Locations,
             while (*CurTokens) {
                 /* Get pin */
                 k = my_atoi(*CurTokens);
-
-                if (k >= Type->num_pins) {
-                    printf(ERRTAG
-                           "Pin %d of type '%s' is not a valid pin.\n",
+                if (k >= Type->num_type_pins) {
+                    printf(ERRTAG "Pin %d of type '%s' is not a valid pin.\n",
                            k, Type->name);
                     exit(1);
                 }
@@ -1186,7 +1184,7 @@ static void SetupEmptyType()
     type_descriptor_t* type;
     type = &type_descriptors[EMPTY_TYPE->index];
     type->name = "<EMPTY>";
-    type->num_pins = 0;
+    type->num_type_pins = 0;
     type->height = 1;
     type->capacity = 0;
     type->num_drivers = 0;
@@ -1234,12 +1232,14 @@ static void ProcessIO(INOUT ezxml_t Node,
     /* Initialize and setup type */
     int num_inputs = 1;
     int num_outputs = 1;
+    /* FIXME, Why ??? */
     int num_pins = 3 * capacity;
-    type->num_pins = num_pins;
+    type->num_type_pins = num_pins;
     type->num_drivers = num_outputs * capacity;
     type->num_receivers = num_inputs * capacity;
     type->pinloc = (int***)alloc_matrix3(0, 0, 0,
-                                         3, 0, num_pins - 1, sizeof(int));
+                                         3, 0, num_pins - 1,
+                                         sizeof(int));
 
     /* Jason Luu - September 5, 2007
      * To treat IOs as any other block in routing, need to blackbox
@@ -1292,13 +1292,9 @@ static void ProcessIO(INOUT ezxml_t Node,
 
         for (i = 0; i < num_clocks; ++i) {
             type->class_inf[3 * j + CLKCLASS].pinlist[i] =
-                num_pins * j / capacity + i + num_inputs +
-                num_outputs;
-            type->pin_class[num_pins * j / capacity + i +
-                            num_inputs + num_outputs] =
-                                3 * j + CLKCLASS;
-            type->is_global_pin[num_pins * j / capacity + i +
-                                num_inputs + num_outputs] = TRUE;
+                num_pins * j / capacity + i + num_inputs + num_outputs;
+            type->pin_class[num_pins * j / capacity + i + num_inputs + num_outputs] = 3 * j + CLKCLASS;
+            type->is_global_pin[num_pins * j / capacity + i + num_inputs + num_outputs] = TRUE;
         }
     }
 
@@ -1835,13 +1831,13 @@ void EchoArch(IN const char* EchoFile,
         fprintf(Echo, "\tcapacity: %d\n", Types[i].capacity);
         fprintf(Echo, "\theight: %d\n", Types[i].height);
 
-        if (Types[i].num_pins > 0) {
+        if (Types[i].num_type_pins > 0) {
             for (j = 0; j < Types[i].height; ++j) {
                 fprintf(Echo,
                         "\tpinloc[%d] TOP LEFT BOTTOM RIGHT:\n",
                         j);
 
-                for (k = 0; k < Types[i].num_pins; ++k) {
+                for (k = 0; k < Types[i].num_type_pins; ++k) {
                     fprintf(Echo, "\t\t%d %d %d %d\n",
                             Types[i].pinloc[j][TOP][k],
                             Types[i].pinloc[j][LEFT][k],
@@ -1852,12 +1848,12 @@ void EchoArch(IN const char* EchoFile,
         }
 
         fprintf(Echo, "\tnum_pins (scaled for capacity): %d\n",
-                Types[i].num_pins);
+                Types[i].num_type_pins);
 
-        if (Types[i].num_pins > 0) {
+        if (Types[i].num_type_pins > 0) {
             fprintf(Echo, "\tPins: NAME CLASS IS_GLOBAL\n");
 
-            for (j = 0; j < Types[i].num_pins; ++j) {
+            for (j = 0; j < Types[i].num_type_pins; ++j) {
                 fprintf(Echo, "\t\t%d %d %s\n", j,
                         Types[i].pin_class[j],
                         (Types[i].
@@ -1891,8 +1887,7 @@ void EchoArch(IN const char* EchoFile,
                         Types[i].class_inf[j].num_pins);
                 fprintf(Echo, "\t\t\tpins: ");  /* No \n */
 
-                for (k = 0; k < Types[i].class_inf[j].num_pins;
-                        ++k) {
+                for (k = 0; k < Types[i].class_inf[j].num_pins; ++k) {
                     fprintf(Echo, "%d ", Types[i].class_inf[j].pinlist[k]); /* No \n */
                 }
 

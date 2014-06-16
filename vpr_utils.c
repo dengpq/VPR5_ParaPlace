@@ -95,7 +95,7 @@ void sync_nets_to_blocks(IN int num_blocks,
     for (j = 0; j < num_blocks; ++j) {
         cur_type = block_list[j].block_type;
 
-        for (k = 0; k < cur_type->num_pins; ++k) {
+        for (k = 0; k < cur_type->num_type_pins; ++k) {
             i = block_list[j].nets[k];
 
             if ( i >= 0 && RECEIVER == cur_type->class_inf[cur_type->pin_class[k]].type) {
@@ -129,7 +129,7 @@ void sync_nets_to_blocks(IN int num_blocks,
     for (j = 0; j < num_blocks; ++j) {
         cur_type = block_list[j].block_type;
 
-        for (k = 0; k < cur_type->num_pins; ++k) {
+        for (k = 0; k < cur_type->num_type_pins; ++k) {
             i = block_list[j].nets[k];
 
             if (i >= 0 && RECEIVER == cur_type->class_inf[cur_type->pin_class[k]].type) {
@@ -191,7 +191,7 @@ load_one_fb_fanout_count(subblock_t* subblock_inf,
     int internal_sub, internal_pin;
 
     /* Reset ipin counts */
-    for (ipin = 0; ipin < type->num_pins; ipin++) {
+    for (ipin = 0; ipin < type->num_type_pins; ipin++) {
         num_uses_of_fb_ipin[ipin] = 0;
     }
 
@@ -221,17 +221,16 @@ load_one_fb_fanout_count(subblock_t* subblock_inf,
 
         for (ipin = 0; ipin < type->max_subblock_inputs; ipin++) {
             conn_pin = subblock_inf[isub].inputs[ipin];
-
             if (conn_pin != OPEN) {
-                if (conn_pin < type->num_pins) {
+                if (conn_pin < type->num_type_pins) {
                     /* Driven by FB ipin */
                     num_uses_of_fb_ipin[conn_pin]++;
                 } else {
                     /* Driven by sblk output in same fb */
-                    internal_sub =
-                      (conn_pin - type->num_pins) / type->max_subblock_outputs;
-                    internal_pin =
-                      (conn_pin - type->num_pins) % type->max_subblock_outputs;
+                    internal_sub = (conn_pin - type->num_type_pins) /
+                                     type->max_subblock_outputs;
+                    internal_pin = (conn_pin - type->num_type_pins) %
+                                     type->max_subblock_outputs;
                     num_uses_of_sblk_opin[internal_sub][internal_pin]++;
                 }
             }
@@ -239,15 +238,15 @@ load_one_fb_fanout_count(subblock_t* subblock_inf,
 
         conn_pin = subblock_inf[isub].clock;    /* Now do clock pin */
         if (conn_pin != OPEN) {
-            if (conn_pin < type->num_pins) {
+            if (conn_pin < type->num_type_pins) {
                 /* Driven by FB ipin */
                 num_uses_of_fb_ipin[conn_pin]++;
             } else {
                 /* Driven by sblk output in same clb */
                 internal_sub =
-                  (conn_pin - type->num_pins) / type->max_subblock_outputs;
+                  (conn_pin - type->num_type_pins) / type->max_subblock_outputs;
                 internal_pin =
-                  (conn_pin - type->num_pins) % type->max_subblock_outputs;
+                  (conn_pin - type->num_type_pins) % type->max_subblock_outputs;
                 num_uses_of_sblk_opin[internal_sub][internal_pin]++;
             }
         }

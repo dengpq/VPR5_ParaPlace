@@ -45,12 +45,10 @@ static int* alloc_and_load_tnode_fanin_and_check_edges(int* num_sinks_ptr)
 
             for (iedge = 0; iedge < num_out_edges; iedge++) {
                 to_node = tedge[iedge].to_node;
-
                 if (to_node < 0 || to_node >= num_of_vertexs) {
-                    printf
-                    ("Error in alloc_and_load_tnode_fanin_and_check_edges:\n"
-                     "vertexes #%d tedge #%d goes to illegal node #%d.\n",
-                     inode, iedge, to_node);
+                    printf("Error in alloc_and_load_tnode_fanin_and_check_edges:\n"
+                           "vertexes #%d tedge #%d goes to illegal node #%d.\n",
+                           inode, iedge, to_node);
                     error++;
                 }
 
@@ -59,9 +57,8 @@ static int* alloc_and_load_tnode_fanin_and_check_edges(int* num_sinks_ptr)
         } else if (num_out_edges == 0) {
             num_sinks++;
         } else {
-            printf
-            ("Error in alloc_and_load_tnode_fanin_and_check_edges: \n"
-             "vertexes #%d has %d edges.\n", inode, num_out_edges);
+            printf("Error in alloc_and_load_tnode_fanin_and_check_edges: \n"
+                   "vertexes #%d has %d edges.\n", inode, num_out_edges);
             error++;
         }
     }
@@ -76,9 +73,7 @@ static int* alloc_and_load_tnode_fanin_and_check_edges(int* num_sinks_ptr)
     return (tnode_num_fanin);
 }
 
-
-int
-alloc_and_load_timing_graph_levels(void)
+int alloc_and_load_timing_graph_levels(void)
 {
     /* Does a breadth-first search through the timing graph in order to levelize *
      * it.  This allows subsequent breadth-first traversals to be faster. Also   *
@@ -105,16 +100,15 @@ alloc_and_load_timing_graph_levels(void)
     for (inode = 0; inode < num_of_vertexs; inode++) {
         if (tnode_fanin_left[inode] == 0) {
             num_at_level++;
-            nodes_at_level_head =
-                insert_in_int_list(nodes_at_level_head, inode,
-                                   &free_list_head);
+            nodes_at_level_head = insert_in_int_list(nodes_at_level_head,
+                                                     inode,
+                                                     &free_list_head);
         }
     }
 
     alloc_ivector_and_copy_int_list(&nodes_at_level_head, num_at_level,
                                     &tnodes_at_level[0], &free_list_head);
     num_levels = 0;
-
     while (num_at_level != 0) {
         /* Until there's nothing in the queue. */
         num_levels++;
@@ -131,10 +125,9 @@ alloc_and_load_timing_graph_levels(void)
 
                 if (tnode_fanin_left[to_node] == 0) {
                     num_at_level++;
-                    nodes_at_level_head =
-                        insert_in_int_list
-                        (nodes_at_level_head, to_node,
-                         &free_list_head);
+                    nodes_at_level_head = insert_in_int_list(nodes_at_level_head,
+                                                             to_node,
+                                                             &free_list_head);
                 }
             }
         }
@@ -145,9 +138,8 @@ alloc_and_load_timing_graph_levels(void)
                                         &free_list_head);
     }
 
-    tnodes_at_level =
-        (vector_t*)my_realloc(tnodes_at_level,
-                                   num_levels * sizeof(vector_t));
+    tnodes_at_level = (vector_t*)my_realloc(tnodes_at_level,
+                                            num_levels * sizeof(vector_t));
     num_tnode_levels = num_levels;
     free(tnode_fanin_left);
     free_int_list(&free_list_head);
@@ -175,17 +167,14 @@ check_timing_graph(int num_const_gen,
     /* Count I/O input and output pads */
     for (i = 0; i < num_blocks; i++) {
         if (blocks[i].block_type == IO_TYPE) {
-            for (j = 0; j < IO_TYPE->num_pins; j++) {
+            for (j = 0; j < IO_TYPE->num_type_pins; j++) {
                 if (blocks[i].nets[j] != OPEN) {
-                    if (IO_TYPE->
-                            class_inf[IO_TYPE->pin_class[j]].
-                            type == DRIVER) {
+                    if (IO_TYPE->class_inf[IO_TYPE->pin_class[j]].type
+                          == DRIVER) {
                         num_p_inputs++;
                     } else {
-                        assert(IO_TYPE->
-                               class_inf[IO_TYPE->
-                                         pin_class[j]].
-                               type == RECEIVER);
+                        assert(IO_TYPE->class_inf[IO_TYPE->pin_class[j]].type
+                                 == RECEIVER);
                         num_p_outputs++;
                     }
                 }
